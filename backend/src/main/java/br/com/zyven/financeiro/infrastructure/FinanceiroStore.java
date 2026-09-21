@@ -58,14 +58,15 @@ public class FinanceiroStore {
     }
 
     private Lancamento mapear(LancamentoFinanceiroEntity item) {
-        return new Lancamento(item.getId(), item.getDatalancamento(), item.getValor(), item.getDescricao(), item.getCategoria(), item.getOrigemCategoria(), item.getConfianca(), item.getStatus());
+        return new Lancamento(item.getId(), item.getDataLancamento(), item.getValor(), item.getDescricao(), item.getCategoria(), item.getOrigemCategoria(), item.getConfianca(), item.getStatus());
     }
     private String higienizarDescricao(String descricao) {
         String texto = Normalizer.normalize(descricao == null ? "" : descricao, Normalizer.Form.NFKC).replaceAll("[\\p{Cntrl}]", " ").replaceAll("\\s+", " ").trim();
         return texto.isBlank() ? "Lançamento sem descrição" : texto.substring(0, Math.min(texto.length(), 500));
     }
     private String chaveComparacao(String descricao) {
-        return Normalizer.normalize(descricao, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase(java.util.Locale.ROOT).replaceAll("[^A-Z0-9]+", " ").trim();
+        return Normalizer.normalize(descricao, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase(java.util.Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", " ").replaceAll("\\b\\d{3,}\\b", " ").replaceAll("\\s+", " ").trim();
     }
     public record PendenteParaAnalise(UUID lancamentoid, String descricao) { }
     public record SugestaoCategoria(UUID lancamentoid, CategoriaFinanceira categoria, BigDecimal confianca) { }
