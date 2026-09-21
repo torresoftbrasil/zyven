@@ -1,0 +1,59 @@
+<header class="topbar">
+  <a class="brand" href="#" aria-label="Zyven, início" (click)="selecionarModulo('inicio', $event)">
+    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span>Z Y V E N</span>
+  </a>
+  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time></div>
+</header>
+
+<main>
+  <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven">
+    <app-voice-waveform />
+  </section>
+
+  @if (painelVisivel()) {
+    <button class="backdrop" [class.closing]="painelFechando()" type="button" aria-label="Fechar painel" (click)="fecharPainel()"></button>
+    <section class="workspace" [class.closing]="painelFechando()" aria-labelledby="tituloModulo">
+      <div class="panel-scan" aria-hidden="true"></div>
+      <div class="panel-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <header class="panel-header">
+        <div><span>MOD // {{ codigoModulo() }}</span><h1 id="tituloModulo">{{ tituloModulo() }}</h1></div>
+        <div class="actions"><button type="button" (click)="abrirModal()">+ Incluir</button><button type="button" aria-label="Fechar" (click)="fecharPainel()">×</button></div>
+      </header>
+      <nav class="tabs panel-tabs" aria-label="Seções do módulo">
+        @for (aba of abas; track aba) {
+          <button type="button" [class.active]="abaAtiva() === aba" (click)="abaAtiva.set(aba)">{{ aba }}</button>
+        }
+      </nav>
+      <div class="panel-content">
+        <div class="metrics">
+          @for (metrica of metricas(); track metrica.rotulo) {
+            <article><span>{{ metrica.rotulo }}</span><strong>{{ metrica.valor }}</strong><small>{{ metrica.detalhe }}</small></article>
+          }
+        </div>
+        <div class="dashboard">
+          <article class="chart"><header><span>VISÃO DO PERÍODO</span><small>DADOS MOCKADOS</small></header><div>@for (valor of grafico; track $index) {<i [style.height.%]="valor"></i>}</div></article>
+          <article class="activity"><header><span>ATIVIDADE RECENTE</span><small>HOJE</small></header><ul>@for (item of atividades(); track item.titulo) {<li><i></i><span>{{ item.titulo }}<small>{{ item.tipo }}</small></span><b>{{ item.valor }}</b></li>}</ul></article>
+        </div>
+      </div>
+    </section>
+  }
+</main>
+
+<aside class="coordinates"><span>LAT <b>--23.5505</b></span><span>LNG <b>--46.6333</b></span></aside>
+<aside class="secure"><i></i>CONEXÃO SEGURA</aside>
+
+<nav class="system-nav" aria-label="Módulos do sistema">
+  @for (modulo of modulos; track modulo.id) {
+    <button type="button" [class.active]="moduloAtivo() === modulo.id" (click)="selecionarModulo(modulo.id)"><span>{{ modulo.codigo }}</span>{{ modulo.nome }}</button>
+  }
+</nav>
+
+@if (modalAberto()) {
+  <div class="modal-backdrop" role="presentation" (click)="fecharModalExterno($event)">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
+      <header><div><span>NOVO REGISTRO</span><h2 id="tituloModal">Incluir em {{ tituloModulo().toLowerCase() }}</h2></div><button type="button" aria-label="Fechar" (click)="fecharModal()">×</button></header>
+      <form (submit)="salvar($event)"><label>Descrição<input type="text" required placeholder="Informe uma descrição"></label><label>Data<input type="date" required></label><footer><button type="button" (click)="fecharModal()">Cancelar</button><button type="submit">Salvar registro</button></footer></form>
+    </section>
+  </div>
+}
