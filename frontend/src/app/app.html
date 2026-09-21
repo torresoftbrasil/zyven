@@ -6,6 +6,14 @@
   <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time></div>
 </header>
 
+<section class="access-lock" aria-labelledby="tituloAcesso">
+  <span>IDENTIDADE // VERIFICAÇÃO LOCAL</span>
+  <h1 id="tituloAcesso">Zyven protegido</h1>
+  <p>Aguardando autenticação por passkey. Use Face ID, impressão digital ou o PIN seguro do seu dispositivo.</p>
+  <div class="access-status"><i></i> AGUARDANDO SUA CHAVE DE ACESSO</div>
+  <small>Nenhum áudio, dado pessoal ou sessão de IA é iniciado antes da confirmação.</small>
+</section>
+
 <main>
   <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven">
     <app-voice-waveform />
