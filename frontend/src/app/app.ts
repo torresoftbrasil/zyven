@@ -3,6 +3,7 @@ import { VoiceWaveform } from './shared/voice-waveform/voice-waveform';
 import { GeminiLive } from './core/gemini/gemini-live';
 import { ZyvenAudioState } from './core/audio/zyven-audio-state';
 import { CategoriaFinanceira, FinanceiroApi, LancamentoFinanceiro } from './financeiro/financeiro-api';
+import { AutenticacaoApi } from './core/autenticacao/autenticacao-api';
 
 type ModuloId = 'inicio' | 'financeiro' | 'agenda' | 'tarefas' | 'integracoes';
 
@@ -42,6 +43,10 @@ export class App implements OnDestroy {
     { valor: 'ALIMENTACAO', rotulo: 'Alimentação' }, { valor: 'MORADIA', rotulo: 'Moradia' }, { valor: 'TRANSPORTE', rotulo: 'Transporte' }, { valor: 'SAUDE', rotulo: 'Saúde' }, { valor: 'LAZER', rotulo: 'Lazer' }, { valor: 'ASSINATURAS', rotulo: 'Assinaturas' }, { valor: 'EDUCACAO', rotulo: 'Educação' }, { valor: 'COMPRAS', rotulo: 'Compras' }, { valor: 'TARIFAS', rotulo: 'Tarifas' }, { valor: 'TRANSFERENCIAS', rotulo: 'Transferências' }, { valor: 'RECEITAS', rotulo: 'Receitas' }, { valor: 'OUTROS', rotulo: 'Outros' },
   ];
   readonly horario = signal(this.formatarHorario());
+  readonly autenticado = signal(false);
+  readonly autenticando = signal(false);
+  readonly loginErro = signal('');
+  readonly usuario = signal('');
   readonly tituloModulo = computed(() => this.modulos.find((modulo) => modulo.id === this.moduloAtivo())?.nome ?? 'Início');
   readonly codigoModulo = computed(() => this.modulos.find((modulo) => modulo.id === this.moduloAtivo())?.codigo ?? '01');
   readonly metricas = computed<Metrica[]>(() => [
@@ -57,9 +62,14 @@ export class App implements OnDestroy {
 
   private readonly clockInterval: number;
 
-  constructor(private readonly geminiLive: GeminiLive, private readonly financeiroApi: FinanceiroApi, readonly audioState: ZyvenAudioState) {
+  constructor(
+    private readonly geminiLive: GeminiLive,
+    private readonly financeiroApi: FinanceiroApi,
+    private readonly autenticacaoApi: AutenticacaoApi,
+    readonly audioState: ZyvenAudioState,
+  ) {
     this.clockInterval = window.setInterval(() => this.horario.set(this.formatarHorario()), 1000);
-    document.addEventListener('pointerdown', this.connectLive, { once: true });
+    void this.recuperarSessao();
   }
 
   ngOnDestroy(): void {
@@ -90,6 +100,27 @@ export class App implements OnDestroy {
   fecharModal(): void { this.modalAberto.set(false); }
   fecharModalExterno(evento: MouseEvent): void { if (evento.target === evento.currentTarget) this.fecharModal(); }
   salvar(evento: Event): void { evento.preventDefault(); this.fecharModal(); }
+
+  entrar(evento: Event): void {
+    evento.preventDefault();
+    if (this.autenticando()) return;
+    const dados = new FormData(evento.currentTarget as HTMLFormElement);
+    this.autenticando.set(true);
+    this.loginErro.set('');
+    void this.autenticacaoApi.entrar(String(dados.get('login') ?? ''), String(dados.get('senha') ?? ''))
+      .then((sessao) => this.iniciarSessao(sessao.login))
+      .catch(() => this.loginErro.set('Login ou senha inválidos.'))
+      .finally(() => this.autenticando.set(false));
+  }
+
+  sair(): void {
+    void this.autenticacaoApi.sair().finally(() => {
+      this.autenticado.set(false);
+      this.usuario.set('');
+      document.removeEventListener('pointerdown', this.connectLive);
+      void this.geminiLive.disconnect();
+    });
+  }
 
   importarOfx(evento: Event): void {
     const campo = evento.target as HTMLInputElement;
@@ -128,5 +159,14 @@ export class App implements OnDestroy {
   fecharComEscape(): void { this.modalAberto() ? this.fecharModal() : this.fecharPainel(); }
 
   private formatarHorario(): string { return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date()); }
+  private async recuperarSessao(): Promise<void> {
+    try { this.iniciarSessao((await this.autenticacaoApi.sessao()).login); }
+    catch { /* Sem sessão anterior: manter a tela de login. */ }
+  }
+  private iniciarSessao(login: string): void {
+    this.usuario.set(login);
+    this.autenticado.set(true);
+    document.addEventListener('pointerdown', this.connectLive, { once: true });
+  }
   private readonly connectLive = (): void => { void this.geminiLive.connect(); };
 }

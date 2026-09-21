@@ -27,9 +27,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:?}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
-      ZYVEN_WEBAUTHN_RPID: ${ZYVEN_WEBAUTHN_RPID:?}
-      ZYVEN_WEBAUTHN_ORIGIN: ${ZYVEN_WEBAUTHN_ORIGIN:?}
-      ZYVEN_AUTENTICACAO_CADASTRO_TOKEN: ${ZYVEN_AUTENTICACAO_CADASTRO_TOKEN:?}
+      ZYVEN_SESSION_COOKIE_SECURE: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -55,4 +53,3 @@ services:
 networks:
   zyven_net:
     name: ${APP_SLUG}_net
-

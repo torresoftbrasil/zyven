@@ -3,16 +3,23 @@
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
     <span>Z Y V E N</span>
   </a>
-  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time></div>
+  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time>@if (autenticado()) { <button type="button" class="logout" (click)="sair()">SAIR</button> }</div>
 </header>
 
-<section class="access-lock" aria-labelledby="tituloAcesso">
-  <span>IDENTIDADE // VERIFICAÇÃO LOCAL</span>
-  <h1 id="tituloAcesso">Zyven protegido</h1>
-  <p>Aguardando autenticação por passkey. Use Face ID, impressão digital ou o PIN seguro do seu dispositivo.</p>
-  <div class="access-status"><i></i> AGUARDANDO SUA CHAVE DE ACESSO</div>
-  <small>Nenhum áudio, dado pessoal ou sessão de IA é iniciado antes da confirmação.</small>
-</section>
+@if (!autenticado()) {
+  <section class="access-lock" aria-labelledby="tituloAcesso">
+    <span>ACESSO PRIVADO // ZYVEN</span>
+    <h1 id="tituloAcesso">Identifique-se</h1>
+    <p>Entre com suas credenciais para iniciar o ambiente pessoal.</p>
+    <form (submit)="entrar($event)">
+      <label>LOGIN<input name="login" autocomplete="username" required maxlength="120" autofocus></label>
+      <label>SENHA<input name="senha" type="password" autocomplete="current-password" required maxlength="200"></label>
+      @if (loginErro()) { <p class="login-error" role="alert">{{ loginErro() }}</p> }
+      <button type="submit" [disabled]="autenticando()">{{ autenticando() ? 'VALIDANDO...' : 'ENTRAR' }}</button>
+    </form>
+    <small>A sessão de voz é habilitada somente após a autenticação.</small>
+  </section>
+}
 
 <main>
   <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven">
