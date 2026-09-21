@@ -8,6 +8,7 @@ interface SessaoLiveResponse {
   model: string;
   voice: string;
   systemInstruction: string;
+  conversaid: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -20,6 +21,7 @@ export class GeminiLive {
   private processor?: ScriptProcessorNode;
   private nextPlaybackTime = 0;
   private setupComplete = false;
+  private conversaId?: string;
 
   constructor(private readonly http: HttpClient, private readonly audioState: ZyvenAudioState) {}
 
@@ -28,6 +30,7 @@ export class GeminiLive {
     const config = await this.http.post<SessaoLiveResponse>('/api/assistente/sessao', {}).toPromise();
     if (!config) throw new Error('Não foi possível criar a sessão do Zyven');
 
+    this.conversaId = config.conversaid;
     const ai = new GoogleGenAI({ apiKey: config.token, httpOptions: { apiVersion: 'v1alpha' } });
     this.session = await ai.live.connect({
       model: config.model,
@@ -88,7 +91,18 @@ export class GeminiLive {
       void this.startMicrophone();
     }
     if (message.serverContent?.interrupted) this.stopPlayback();
+    this.registrarTranscricao(message.serverContent?.inputTranscription?.text, message.serverContent?.inputTranscription?.finished, 'USUARIO');
+    this.registrarTranscricao(message.serverContent?.outputTranscription?.text, message.serverContent?.outputTranscription?.finished, 'ASSISTENTE');
     if (message.data) this.playAudio(message.data);
+  }
+
+  private registrarTranscricao(texto: string | undefined, finalizada: boolean | undefined, papel: 'USUARIO' | 'ASSISTENTE'): void {
+    if (!texto?.trim() || !finalizada || !this.conversaId) return;
+    void this.http.post(`/api/conversas/${this.conversaId}/interacoes`, {
+      papel,
+      origem: 'VOZ',
+      conteudo: texto.trim(),
+    }).toPromise();
   }
 
   private playAudio(base64: string): void {

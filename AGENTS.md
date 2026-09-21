@@ -25,6 +25,27 @@ in production code without explicit approval.
 - `frontend/`: Angular application
 - `backend/`: Spring Boot API and database migrations
 - `prototype/`: approved dependency-free visual prototype
+- `USO_IA.md`: catálogo vivo dos modelos de IA, limites e integrações do produto
+
+## IA e Modelos
+
+Antes de propor, implementar ou alterar uma integração de IA, leia
+`USO_IA.md`. Ele é a fonte do repositório para modelos disponíveis, limites e
+usos aprovados, planejados ou em experimentação.
+
+- Escolha o modelo pelo caso de uso e pela cota ativa, não somente pelo nome ou
+  pela versão mais recente.
+- Nunca exponha chaves, tokens, dados pessoais ou conteúdo sensível em prompts,
+  logs, testes, documentação ou no frontend.
+- Mantenha credenciais exclusivamente em configuração segura do ambiente; não
+  faça commit de segredos.
+- Antes de colocar uma integração em produção, registre-a em `USO_IA.md` com
+  modelo exato, objetivo, dados enviados, responsável, limites e decisão de
+  privacidade/custo pendente ou concluída.
+- Ao descobrir alteração de cota ou disponibilidade no painel do provedor,
+  atualize a tabela e a data do catálogo no mesmo change set.
+- Trate modelos preview como experimentais: isole-os atrás de uma interface de
+  integração e não os torne dependência essencial sem aprovação explícita.
 
 ## Visual Standard
 

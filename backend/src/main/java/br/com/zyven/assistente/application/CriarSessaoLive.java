@@ -6,6 +6,7 @@ import java.util.Map;
 
 import br.com.zyven.assistente.api.SessaoLiveResponse;
 import br.com.zyven.assistente.config.AssistenteProperties;
+import br.com.zyven.conversa.application.GerenciarConversa;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -18,13 +19,15 @@ public class CriarSessaoLive {
 
     private final AssistenteProperties properties;
     private final RestClient restClient;
+    private final GerenciarConversa conversas;
 
-    public CriarSessaoLive(AssistenteProperties properties) {
+    public CriarSessaoLive(AssistenteProperties properties, GerenciarConversa conversas) {
         this.properties = properties;
+        this.conversas = conversas;
         this.restClient = RestClient.create();
     }
 
-    public SessaoLiveResponse executar() {
+    public SessaoLiveResponse executar(java.util.UUID conversaId) {
         String apiKey = properties.gemini().apikey();
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("GEMINI_API_KEY não está configurada no processo do backend");
@@ -54,9 +57,20 @@ public class CriarSessaoLive {
         if (response == null || response.name() == null || response.name().isBlank()) {
             throw new IllegalStateException("Gemini não retornou um token efêmero");
         }
+        java.util.UUID conversa = conversaId == null ? conversas.iniciar("Conversa por voz") : conversaId;
+        GerenciarConversa.Contexto contexto = conversas.montarContexto(conversa);
         return new SessaoLiveResponse(
                 response.name(), properties.gemini().model(), properties.gemini().voice(),
-                properties.assistente().instrucaoSistema());
+                instrucaoComContexto(contexto), conversa);
+    }
+
+    private String instrucaoComContexto(GerenciarConversa.Contexto contexto) {
+        String historico = contexto.interacoesrecentes().stream().map(item -> item.papel() + ": " + item.conteudo()).collect(java.util.stream.Collectors.joining("\n"));
+        String tarefas = contexto.tarefaspendentes().stream().map(item -> item.titulo() + " | " + item.status() + " | prazo: " + item.datalimite()).collect(java.util.stream.Collectors.joining("\n"));
+        String sugestoes = contexto.demandassugeridas().stream().map(item -> item.titulo() + " | sugestão pendente").collect(java.util.stream.Collectors.joining("\n"));
+        return properties.assistente().instrucaoSistema() + "\n\n" + contexto.regraoperacional()
+                + "\n\nCONTEXTO CANÔNICO DO ZYVEN (use apenas estes fatos):\nHistórico recente:\n" + historico
+                + "\nTarefas pendentes:\n" + tarefas + "\nSugestões aguardando revisão:\n" + sugestoes;
     }
 
     private record TokenResponse(String name) {
