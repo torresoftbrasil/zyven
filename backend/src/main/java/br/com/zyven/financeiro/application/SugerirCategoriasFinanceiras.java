@@ -22,11 +22,11 @@ public class SugerirCategoriasFinanceiras {
     private static final Logger LOGGER = LoggerFactory.getLogger(SugerirCategoriasFinanceiras.class);
     private static final String INSTRUCAO = "Classifique descrições higienizadas de transações brasileiras. Retorne JSON puro {\"sugestoes\":[{\"id\":string,\"categoria\":ALIMENTACAO|MORADIA|TRANSPORTE|SAUDE|LAZER|ASSINATURAS|EDUCACAO|COMPRAS|TARIFAS|TRANSFERENCIAS|RECEITAS|OUTROS,\"confianca\":0..1}]}. Não infira pessoa, conta, localização ou dados além da categoria. Para incerteza, use OUTROS e confiança baixa.";
     private final AssistenteProperties properties;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
 
-    public SugerirCategoriasFinanceiras(AssistenteProperties properties, ObjectMapper objectMapper) {
-        this.properties = properties; this.objectMapper = objectMapper; restClient = RestClient.create();
+    public SugerirCategoriasFinanceiras(AssistenteProperties properties) {
+        this.properties = properties; restClient = RestClient.create();
     }
 
     public List<FinanceiroStore.SugestaoCategoria> executar(List<FinanceiroStore.PendenteParaAnalise> pendentes) {

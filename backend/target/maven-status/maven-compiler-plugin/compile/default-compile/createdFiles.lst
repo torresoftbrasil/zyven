@@ -17,6 +17,7 @@ br/com/zyven/planejamento/infrastructure/PlanejamentoStore$Grupo.class
 br/com/zyven/conversa/infrastructure/ConversaStore$ResumoInteracao.class
 br/com/zyven/planejamento/domain/StatusTarefa.class
 br/com/zyven/conversa/api/ConversaController$IniciarConversaRequest.class
+br/com/zyven/acontecimento/api/ResumoInicialController.class
 br/com/zyven/assistente/application/CriarSessaoLive$TokenResponse.class
 br/com/zyven/MigrationApplication.class
 br/com/zyven/assistente/config/AssistenteProperties$Assistente.class
@@ -41,6 +42,7 @@ br/com/zyven/conversa/api/ConversaController$RegistrarInteracaoRequest.class
 br/com/zyven/conversa/application/GerenciarConversa$Contexto.class
 br/com/zyven/planejamento/api/PlanejamentoController$GrupoRequest.class
 br/com/zyven/planejamento/infrastructure/PlanejamentoStore$Demanda.class
+br/com/zyven/acontecimento/api/ResumoInicialController$ResumoInicialResponse.class
 br/com/zyven/planejamento/infrastructure/PlanejamentoStore$Tarefa.class
 br/com/zyven/planejamento/infrastructure/TarefaEntity.class
 br/com/zyven/planejamento/infrastructure/DemandaSugeridaEntity.class

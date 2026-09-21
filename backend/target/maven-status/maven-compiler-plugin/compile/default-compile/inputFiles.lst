@@ -1,5 +1,11 @@
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/MigrationApplication.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/ZyvenApplication.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/api/AcontecimentoController.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/api/ResumoInicialController.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/domain/ImportanciaAcontecimento.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/infrastructure/AcontecimentoEntity.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/infrastructure/AcontecimentoJpaRepository.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/acontecimento/infrastructure/AcontecimentoStore.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/api/AssistenteController.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/api/SessaoLiveResponse.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/application/AnalisarDemandas.java
@@ -13,6 +19,15 @@
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/conversa/infrastructure/ConversaEntity.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/conversa/infrastructure/ConversaJpaRepository.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/conversa/infrastructure/ConversaStore.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/api/FinanceiroController.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/application/ImportarOfx.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/application/LeitorOfx.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/application/SugerirCategoriasFinanceiras.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/domain/CategoriaFinanceira.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/domain/TransacaoOfx.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/infrastructure/FinanceiroEntity.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/infrastructure/FinanceiroJpaRepository.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/financeiro/infrastructure/FinanceiroStore.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/planejamento/api/PlanejamentoController.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/planejamento/domain/ClassificacaoTarefa.java
 /home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/planejamento/domain/PrioridadeTarefa.java
