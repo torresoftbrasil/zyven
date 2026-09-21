@@ -1,0 +1,10 @@
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/MigrationApplication.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/ZyvenApplication.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/api/AssistenteController.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/api/SessaoLiveResponse.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/application/CriarSessaoLive.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/config/AssistenteProperties.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/assistente/config/GeminiKeyLogger.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/shared/api/ApiError.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/shared/api/GlobalExceptionHandler.java
+/home/sonner/dev/grp-web/zyven/backend/src/main/java/br/com/zyven/shared/config/WebConfig.java

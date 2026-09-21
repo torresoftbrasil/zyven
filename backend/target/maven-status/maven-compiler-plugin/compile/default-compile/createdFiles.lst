@@ -1,0 +1,14 @@
+br/com/zyven/assistente/application/CriarSessaoLive.class
+br/com/zyven/assistente/api/SessaoLiveResponse.class
+br/com/zyven/shared/api/ApiError$FieldError.class
+br/com/zyven/shared/api/ApiError.class
+br/com/zyven/shared/config/WebConfig.class
+br/com/zyven/assistente/api/AssistenteController.class
+br/com/zyven/assistente/config/AssistenteProperties$Gemini.class
+br/com/zyven/assistente/config/GeminiKeyLogger.class
+br/com/zyven/assistente/config/AssistenteProperties.class
+br/com/zyven/assistente/application/CriarSessaoLive$TokenResponse.class
+br/com/zyven/MigrationApplication.class
+br/com/zyven/assistente/config/AssistenteProperties$Assistente.class
+br/com/zyven/ZyvenApplication.class
+br/com/zyven/shared/api/GlobalExceptionHandler.class
