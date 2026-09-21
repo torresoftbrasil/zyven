@@ -25,8 +25,6 @@ public class GeminiKeyLogger implements ApplicationRunner {
             return;
         }
 
-        String prefix = apiKey.substring(0, Math.min(4, apiKey.length()));
-        String suffix = apiKey.substring(Math.max(0, apiKey.length() - 4));
-        LOGGER.info("Gemini API key carregada: {}...{} ({} caracteres)", prefix, suffix, apiKey.length());
+        LOGGER.info("Gemini API key carregada");
     }
 }
