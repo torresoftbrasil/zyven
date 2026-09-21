@@ -21,11 +21,25 @@
         <div class="actions"><button type="button" (click)="abrirModal()">+ Incluir</button><button type="button" aria-label="Fechar" (click)="fecharPainel()">×</button></div>
       </header>
       <nav class="tabs panel-tabs" aria-label="Seções do módulo">
-        @for (aba of abas; track aba) {
+        @for (aba of abas(); track aba) {
           <button type="button" [class.active]="abaAtiva() === aba" (click)="abaAtiva.set(aba)">{{ aba }}</button>
         }
       </nav>
       <div class="panel-content">
+        @if (moduloAtivo() === 'financeiro' && abaAtiva() === 'Importar OFX') {
+          <section class="ofx-import" aria-labelledby="tituloImportacaoOfx">
+            <header><div><span>IMPORTAÇÃO LOCAL // OFX</span><h2 id="tituloImportacaoOfx">Extrato financeiro</h2></div><small>REVISÃO INTELIGENTE</small></header>
+            <p>O arquivo é higienizado no Zyven. Regras confirmadas são aplicadas primeiro; somente descrições sem correspondência seguem para sugestão de categoria.</p>
+            <label class="file-drop" [class.loading]="financeiroImportando()"><input type="file" accept=".ofx,application/x-ofx" (change)="importarOfx($event)" [disabled]="financeiroImportando()"><strong>{{ financeiroImportando() ? 'PROCESSANDO OFX...' : 'SELECIONAR ARQUIVO OFX' }}</strong><small>Máximo 5 MB · senhas e dados da conta não são enviados à IA</small></label>
+            @if (financeiroMensagem()) { <p class="import-feedback success">{{ financeiroMensagem() }}</p> }
+            @if (financeiroErro()) { <p class="import-feedback error">{{ financeiroErro() }}</p> }
+          </section>
+        } @else if (moduloAtivo() === 'financeiro' && abaAtiva() === 'Registros') {
+          <section class="review-list" aria-labelledby="tituloRevisao">
+            <header><div><span>REVISÃO NECESSÁRIA</span><h2 id="tituloRevisao">Categorias pendentes</h2></div><small>{{ totalPendentes() }} PENDENTE(S)</small></header>
+            @if (financeiroCarregando()) { <p>Carregando lançamentos…</p> } @else if (lancamentosPendentes().length === 0) { <p>Nenhum lançamento aguardando revisão.</p> } @else { <ul>@for (lancamento of lancamentosPendentes(); track lancamento.id) { <li><div><strong>{{ lancamento.descricao }}</strong><span>{{ lancamento.data }} · {{ formatarValor(lancamento.valor) }}</span></div><span class="suggestion">{{ rotuloCategoria(lancamento.categoria) }}{{ formatarConfianca(lancamento.confianca) }}</span><select aria-label="Confirmar categoria" (change)="confirmarLancamento(lancamento, $event)"><option value="">Confirmar categoria…</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor" [selected]="categoria.valor === lancamento.categoria">{{ categoria.rotulo }}</option>}</select></li> }</ul> }
+          </section>
+        } @else {
         <div class="metrics">
           @for (metrica of metricas(); track metrica.rotulo) {
             <article><span>{{ metrica.rotulo }}</span><strong>{{ metrica.valor }}</strong><small>{{ metrica.detalhe }}</small></article>
@@ -35,6 +49,7 @@
           <article class="chart"><header><span>VISÃO DO PERÍODO</span><small>DADOS MOCKADOS</small></header><div>@for (valor of grafico; track $index) {<i [style.height.%]="valor"></i>}</div></article>
           <article class="activity"><header><span>ATIVIDADE RECENTE</span><small>HOJE</small></header><ul>@for (item of atividades(); track item.titulo) {<li><i></i><span>{{ item.titulo }}<small>{{ item.tipo }}</small></span><b>{{ item.valor }}</b></li>}</ul></article>
         </div>
+        }
       </div>
     </section>
   }

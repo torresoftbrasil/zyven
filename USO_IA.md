@@ -121,6 +121,7 @@ uma nova linha antes de enviar uma integração para produção.
 | --- | --- | --- | --- | --- | --- | --- |
 | Implementado (em desenvolvimento) | Assistente de voz Zyven | Gemini 2.5 Flash Native Audio Preview (`gemini-2.5-flash-native-audio-preview-12-2025`) | Conversa bidirecional por voz em tempo real | Áudio PCM do microfone e instrução de sistema; token efêmero criado pelo backend | Produto/Backend | Sessão Live com transcrição de entrada e saída, retomada de sessão e janela deslizante. Validar custo, privacidade e latência antes de produção. |
 | Em experimentação | Extração de demandas pessoais | Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) | Identificar tarefas mencionadas pelo usuário e classificá-las como sugestões para revisão | Apenas transcrição textual da fala candidata; não envia chave, token, histórico integral ou dados externos | Produto/Backend | Acionado somente por sinais determinísticos de demanda. Cota informada: 15 RPM / 250K TPM / 500 RPD. Confirmar disponibilidade do identificador no provedor antes de produção. |
+| Em experimentação | Categorização de OFX | Gemini 3.5 Flash Lite (`gemini-3.5-flash-lite`) | Sugerir categoria apenas para lançamentos sem regra local, sempre sujeitos à revisão | Identificador interno temporário e descrição higienizada; não envia arquivo OFX, conta, saldo, identificador bancário ou credencial | Produto/Backend | Acionado após regras locais. Sem envio se não houver chave de API. Validar contrato, retenção pelo provedor, custo e decisão LGPD antes de produção. |
 
 ### Modelo de nova entrada
 

@@ -25,6 +25,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, "Dados inválidos", request, fields);
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<ApiError> handleBusinessValidation(IllegalArgumentException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> handleUnexpected(Exception exception, HttpServletRequest request) {
         LOGGER.error("Erro não tratado em {}", request.getRequestURI(), exception);
