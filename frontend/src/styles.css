@@ -97,3 +97,32 @@ body { overflow: hidden; background: #03080d; }
 @media(prefers-reduced-motion:reduce){.atom-nav::before,.field-ring,.orbit-option::before{animation:none}.atom-nav::after{display:none}}
 
 @media(max-width:650px){app-root{display:block;height:100dvh;overflow-y:auto!important}}
+
+/* Esferas percorrem uma órbita lenta; o SVG fica suspenso acima do vidro. */
+.atom-nav{perspective:1100px}
+.atom-nav::before{background:radial-gradient(circle at 28% 21%,#d0faff29,transparent 17%),radial-gradient(circle at 38% 32%,#3189a63d,#0a2a3970 47%,#020a10e0 77%,#041c29 96%);border:1px solid #a4f2ff2a;box-shadow:inset 10px 11px 28px #c0f7ff14,inset -42px -48px 70px #000b,0 0 85px #3dd4ff1d,0 18px 70px #0008}
+.orbit-option,.orbit-option[data-module]{left:50%;top:47%;animation:none;transform-style:preserve-3d;will-change:transform;backface-visibility:hidden;filter:none}
+.orbit-option{border:1px solid #c4f7ff91;background:radial-gradient(circle at 27% 19%,#ecffffaf 0,#a8eeff52 8%,transparent 23%),radial-gradient(circle at 35% 26%,#236c88,#0b3448 44%,#031018 78%);box-shadow:inset 5px 5px 13px #b5f7ff65,inset -15px -16px 24px #000d,0 10px 15px #000a,0 20px 32px #0009,0 0 23px #65dfff3d}
+.orbit-option::after{inset:3px;background:radial-gradient(ellipse at 27% 17%,#e2ffff70,transparent 35%),linear-gradient(145deg,#c8faff10,transparent 51%);border-radius:50%;transform:translateZ(12px);opacity:var(--luz,.55)}
+.orbit-icon{transform:translateZ(23px);filter:drop-shadow(2px 3px 2px #000b) drop-shadow(0 0 4px #b5f5ff);animation:icon-levitate 6s ease-in-out infinite alternate}
+.orbit-icon svg{stroke-width:1.8;filter:drop-shadow(-1px -1px 1px #edffff80) drop-shadow(2px 2px 2px #00121c)}
+.orbit-name{transform:translate(-50%,-5px) translateZ(18px)}
+.orbit-option:hover .orbit-name,.orbit-option:focus-visible .orbit-name{transform:translate(-50%,0) translateZ(18px)}
+@keyframes icon-levitate{from{transform:translateZ(18px) translateY(2px)}to{transform:translateZ(27px) translateY(-2px)}}
+@media(max-width:650px){.orbit-option,.orbit-option[data-module]{top:39%}.orbit-option{width:52px;height:52px}.orbit-icon{width:24px;height:24px}}
+@media(prefers-reduced-motion:reduce){
+  .orbit-icon{animation:none}
+  .orbit-option,.orbit-option[data-module]{will-change:auto;transform:translate(-50%,-50%)}
+  .orbit-option[data-module=financeiro]{left:15%;top:38%}
+  .orbit-option[data-module=academia]{left:83%;top:37%}
+  .orbit-option[data-module=agenda]{left:25%;top:73%}
+  .orbit-option[data-module=tarefas]{left:76%;top:73%}
+  .orbit-option[data-module=integracoes]{left:51%;top:19%}
+}
+@media(max-width:650px) and (prefers-reduced-motion:reduce){
+  .orbit-option[data-module=financeiro]{left:19%;top:71%}
+  .orbit-option[data-module=academia]{left:81%;top:71%}
+  .orbit-option[data-module=agenda]{left:16%;top:35%}
+  .orbit-option[data-module=tarefas]{left:84%;top:35%}
+  .orbit-option[data-module=integracoes]{left:50%;top:20%}
+}

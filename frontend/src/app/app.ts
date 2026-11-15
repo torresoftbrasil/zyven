@@ -1,4 +1,4 @@
-import { Component, computed, HostListener, OnDestroy, signal } from '@angular/core';
+import { AfterViewInit, Component, computed, HostListener, NgZone, OnDestroy, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { VoiceWaveform } from './shared/voice-waveform/voice-waveform';
@@ -22,7 +22,7 @@ interface Atividade { titulo: string; tipo: string; valor: string; }
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App implements OnDestroy {
+export class App implements AfterViewInit, OnDestroy {
   readonly modulos: Modulo[] = [
     { id: 'inicio', codigo: '01', nome: 'Início' },
     { id: 'financeiro', codigo: '02', nome: 'Financeiro' },
@@ -99,6 +99,7 @@ export class App implements OnDestroy {
   private readonly notificacaoInterval: number;
   private importacaoInterval?: number;
   private focoFrame = 0;
+  private orbitaFrame = 0;
 
   constructor(
     private readonly geminiLive: GeminiLive,
@@ -108,6 +109,7 @@ export class App implements OnDestroy {
     readonly passkeyApi: PasskeyApi,
     private readonly notificacaoApi: NotificacaoApi,
     readonly audioState: ZyvenAudioState,
+    private readonly zone: NgZone,
   ) {
     this.clockInterval = window.setInterval(() => this.horario.set(this.formatarHorario()), 1000);
     this.notificacaoInterval = window.setInterval(() => { if (this.autenticado()) void this.avaliarNotificacoes(); }, 15 * 60 * 1000);
@@ -124,8 +126,46 @@ export class App implements OnDestroy {
     });
   }
 
+  ngAfterViewInit(): void {
+    if (typeof window.matchMedia !== 'function' || typeof window.requestAnimationFrame !== 'function') return;
+    this.zone.runOutsideAngular(() => {
+      const fases: Record<string, number> = { financeiro: 198, academia: -18, agenda: 126, tarefas: 54, integracoes: -90 };
+      const movimentoReduzido = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let angulo = 0;
+      let ultimoTempo = 0;
+      const animar = (tempo: number): void => {
+        const nav = document.querySelector<HTMLElement>('.atom-nav');
+        if (nav && !movimentoReduzido.matches && !this.painelVisivel()) {
+          const intervalo = ultimoTempo ? Math.min(tempo - ultimoTempo, 50) : 0;
+          const sobFoco = nav.querySelector('.orbit-option:hover, .orbit-option:focus-visible') !== null;
+          angulo += intervalo * (Math.PI * 2 / 180_000) * (sobFoco ? .08 : 1);
+          const largura = nav.clientWidth;
+          const altura = nav.clientHeight;
+          const celular = largura <= 650;
+          const raioX = celular ? Math.min(largura * .3, 130) : Math.min(largura * .37, 900);
+          const raioY = celular ? Math.min(altura * .12, 118) : Math.min(altura * .29, 280);
+          for (const botao of nav.querySelectorAll<HTMLElement>('.orbit-option')) {
+            const fase = fases[botao.dataset['module'] ?? ''] ?? 0;
+            const posicao = angulo + fase * Math.PI / 180;
+            const profundidade = Math.sin(posicao);
+            const x = Math.cos(posicao) * raioX;
+            const y = Math.sin(posicao) * raioY;
+            const z = profundidade * (celular ? 22 : 55);
+            const escala = 1 + profundidade * .12;
+            botao.style.transform = `translate(-50%, -50%) translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px) scale(${escala.toFixed(3)})`;
+            botao.style.zIndex = profundidade >= 0 ? '3' : '1';
+          }
+        }
+        ultimoTempo = tempo;
+        this.orbitaFrame = requestAnimationFrame(animar);
+      };
+      this.orbitaFrame = requestAnimationFrame(animar);
+    });
+  }
+
   ngOnDestroy(): void {
     cancelAnimationFrame(this.focoFrame);
+    cancelAnimationFrame(this.orbitaFrame);
     clearInterval(this.clockInterval);
     clearInterval(this.notificacaoInterval);
     if (this.importacaoInterval) clearInterval(this.importacaoInterval);
@@ -159,7 +199,7 @@ export class App implements OnDestroy {
         const limite = botao.getBoundingClientRect();
         const distancia = Math.hypot(x - (limite.left + limite.width / 2), y - (limite.top + limite.height / 2));
         const proximidade = Math.max(0, 1 - distancia / 260);
-        botao.style.setProperty('--brilho', (1 + proximidade * .8).toFixed(3));
+        botao.style.setProperty('--luz', (.55 + proximidade * .45).toFixed(3));
       }
     });
   }
@@ -168,7 +208,7 @@ export class App implements OnDestroy {
     cancelAnimationFrame(this.focoFrame);
     const alvo = evento.currentTarget as HTMLElement;
     alvo.style.setProperty('--foco-opacidade', '0');
-    for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--brilho', '1');
+    for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--luz', '.55');
   }
   fecharPainel(): void {
     if (!this.painelVisivel() || this.painelFechando()) return;
