@@ -98,31 +98,78 @@ body { overflow: hidden; background: #03080d; }
 
 @media(max-width:650px){app-root{display:block;height:100dvh;overflow-y:auto!important}}
 
-/* Esferas percorrem uma órbita lenta; o SVG fica suspenso acima do vidro. */
-.atom-nav{perspective:1100px}
-.atom-nav::before{background:radial-gradient(circle at 28% 21%,#d0faff29,transparent 17%),radial-gradient(circle at 38% 32%,#3189a63d,#0a2a3970 47%,#020a10e0 77%,#041c29 96%);border:1px solid #a4f2ff2a;box-shadow:inset 10px 11px 28px #c0f7ff14,inset -42px -48px 70px #000b,0 0 85px #3dd4ff1d,0 18px 70px #0008}
-.orbit-option,.orbit-option[data-module]{left:50%;top:47%;animation:none;transform-style:preserve-3d;will-change:transform;backface-visibility:hidden;filter:none}
-.orbit-option{border:1px solid #c4f7ff91;background:radial-gradient(circle at 27% 19%,#ecffffaf 0,#a8eeff52 8%,transparent 23%),radial-gradient(circle at 35% 26%,#236c88,#0b3448 44%,#031018 78%);box-shadow:inset 5px 5px 13px #b5f7ff65,inset -15px -16px 24px #000d,0 10px 15px #000a,0 20px 32px #0009,0 0 23px #65dfff3d}
-.orbit-option::after{inset:3px;background:radial-gradient(ellipse at 27% 17%,#e2ffff70,transparent 35%),linear-gradient(145deg,#c8faff10,transparent 51%);border-radius:50%;transform:translateZ(12px);opacity:var(--luz,.55)}
-.orbit-icon{transform:translateZ(23px);filter:drop-shadow(2px 3px 2px #000b) drop-shadow(0 0 4px #b5f5ff);animation:icon-levitate 6s ease-in-out infinite alternate}
-.orbit-icon svg{stroke-width:1.8;filter:drop-shadow(-1px -1px 1px #edffff80) drop-shadow(2px 2px 2px #00121c)}
-.orbit-name{transform:translate(-50%,-5px) translateZ(18px)}
-.orbit-option:hover .orbit-name,.orbit-option:focus-visible .orbit-name{transform:translate(-50%,0) translateZ(18px)}
-@keyframes icon-levitate{from{transform:translateZ(18px) translateY(2px)}to{transform:translateZ(27px) translateY(-2px)}}
-@media(max-width:650px){.orbit-option,.orbit-option[data-module]{top:39%}.orbit-option{width:52px;height:52px}.orbit-icon{width:24px;height:24px}}
-@media(prefers-reduced-motion:reduce){
-  .orbit-icon{animation:none}
-  .orbit-option,.orbit-option[data-module]{will-change:auto;transform:translate(-50%,-50%)}
-  .orbit-option[data-module=financeiro]{left:15%;top:38%}
-  .orbit-option[data-module=academia]{left:83%;top:37%}
-  .orbit-option[data-module=agenda]{left:25%;top:73%}
-  .orbit-option[data-module=tarefas]{left:76%;top:73%}
-  .orbit-option[data-module=integracoes]{left:51%;top:19%}
+/* Vidro fosco e luz difusa: o módulo mantém tamanho fixo durante a órbita. */
+.atom-nav { perspective: 1100px; }
+.atom-nav::before {
+  background: radial-gradient(circle at 37% 29%, #72cce31c, transparent 39%),
+              radial-gradient(circle at 44% 42%, #19495c88, #061722cc 70%, #030b11 100%);
+  border-color: #8deaff20;
+  box-shadow: inset -26px -30px 60px #0009, 0 0 85px #3dd4ff13;
 }
-@media(max-width:650px) and (prefers-reduced-motion:reduce){
-  .orbit-option[data-module=financeiro]{left:19%;top:71%}
-  .orbit-option[data-module=academia]{left:81%;top:71%}
-  .orbit-option[data-module=agenda]{left:16%;top:35%}
-  .orbit-option[data-module=tarefas]{left:84%;top:35%}
-  .orbit-option[data-module=integracoes]{left:50%;top:20%}
+.voice app-voice-waveform { pointer-events: none; }
+.orbit-option, .orbit-option[data-module] {
+  left: 50%; top: 47%; scale: 1; animation: none;
+  transform-style: preserve-3d; will-change: transform;
+  filter: none;
+}
+.orbit-option {
+  border: 1px solid #87e9ff4a;
+  background: radial-gradient(circle at 37% 28%, #356f854f, transparent 59%),
+              linear-gradient(150deg, #102b38ed, #07141ced 75%);
+  box-shadow: 0 12px 31px #0008, 0 0 26px #4bd5fa1b, inset 0 0 15px #70e4ff0c;
+  transition: border-color .25s, background .25s, box-shadow .25s;
+}
+.orbit-option::before { inset: -5px; border-color: #7ae5ff1e; border-left-color: #aaf5ff54; border-bottom-color: transparent; }
+.orbit-option::after {
+  inset: 2px; border-radius: 50%;
+  background: radial-gradient(circle 48px at var(--glint-x,35%) var(--glint-y,25%), #b8f4ff4d, transparent 72%);
+  opacity: var(--luz,.55);
+  transform: translateZ(8px);
+}
+.orbit-option:hover, .orbit-option:focus-visible {
+  scale: 1; border-color: #a1edff92;
+  background: radial-gradient(circle at 37% 28%, #3a80956b, transparent 59%), linear-gradient(150deg, #143649ed, #081a24ed 75%);
+  box-shadow: 0 13px 32px #0008, 0 0 34px #66dcfa50, inset 0 0 18px #70e4ff12;
+}
+.orbit-option:hover::before, .orbit-option:focus-visible::before { inset: -5px; border-color: #9aeaff5c; border-bottom-color: transparent; animation-duration: 11s; }
+.orbit-icon { z-index: 1; transform: translateZ(12px); filter: none; animation: none; }
+.orbit-icon svg { stroke-width: 1.55; filter: drop-shadow(0 0 4px #91eaff64); }
+.orbit-name { transform: translate(-50%,-5px) translateZ(10px); }
+.orbit-option:hover .orbit-name, .orbit-option:focus-visible .orbit-name { transform: translate(-50%,0) translateZ(10px); }
+.core-trigger {
+  position: absolute; z-index: 0; left: 50%; top: 47%;
+  width: min(45vmin,500px); height: min(45vmin,500px);
+  padding: 0; border: 1px solid transparent; border-radius: 50%;
+  background: transparent; transform: translate(-50%,-50%);
+  pointer-events: auto; cursor: crosshair;
+}
+.core-trigger:hover { border-color: #7be8ff20; box-shadow: 0 0 44px #55d7fa13; }
+.core-trigger:focus-visible { outline: 2px solid #b1f4ff; outline-offset: 7px; }
+.core-trigger.core-active { background: radial-gradient(circle, #a7f4ff31, transparent 58%); border-color: #9aefff80; }
+.core-trigger.core-active::after { content: ''; position: absolute; inset: 12%; border: 1px solid #bcf8ff8c; border-radius: 50%; animation: core-click-pulse .48s ease-out both; }
+.core-ripple, .core-spark { position: absolute; z-index: 4; display: block; pointer-events: none; }
+.core-ripple { width: 20px; height: 20px; border: 1px solid #c4f9ff; border-radius: 50%; box-shadow: 0 0 18px #72e6ff80; animation: core-ripple .8s ease-out both; }
+.core-spark { width: var(--tamanho,3px); height: var(--tamanho,3px); border-radius: 50%; background: #ddfbff; box-shadow: 0 0 5px 2px #8beeff88; animation: core-spark .85s cubic-bezier(.12,.73,.29,1) var(--atraso,0ms) both; }
+@keyframes core-click-pulse { from { transform: scale(.7); opacity: .9; } to { transform: scale(1.45); opacity: 0; } }
+@keyframes core-ripple { from { transform: translate(-50%,-50%) scale(.3); opacity: .9; } to { transform: translate(-50%,-50%) scale(17); opacity: 0; } }
+@keyframes core-spark { from { transform: translate(-50%,-50%) rotate(var(--angulo)) translateX(0) scale(1); opacity: 1; } to { transform: translate(-50%,-50%) rotate(var(--angulo)) translateX(var(--distancia)) scale(0); opacity: 0; } }
+@media(max-width:650px) {
+  .orbit-option, .orbit-option[data-module] { top: 39%; }
+  .core-trigger { top: 47%; width: min(63vw,360px); height: min(63vw,360px); }
+}
+@media(prefers-reduced-motion:reduce) {
+  .core-trigger.core-active::after, .core-ripple, .core-spark { animation: none; }
+  .orbit-option, .orbit-option[data-module] { will-change: auto; transform: translate(-50%,-50%); }
+  .orbit-option[data-module=financeiro] { left: 15%; top: 38%; }
+  .orbit-option[data-module=academia] { left: 83%; top: 37%; }
+  .orbit-option[data-module=agenda] { left: 25%; top: 73%; }
+  .orbit-option[data-module=tarefas] { left: 76%; top: 73%; }
+  .orbit-option[data-module=integracoes] { left: 51%; top: 19%; }
+}
+@media(max-width:650px) and (prefers-reduced-motion:reduce) {
+  .orbit-option[data-module=financeiro] { left: 19%; top: 71%; }
+  .orbit-option[data-module=academia] { left: 81%; top: 71%; }
+  .orbit-option[data-module=agenda] { left: 16%; top: 35%; }
+  .orbit-option[data-module=tarefas] { left: 84%; top: 35%; }
+  .orbit-option[data-module=integracoes] { left: 50%; top: 20%; }
 }

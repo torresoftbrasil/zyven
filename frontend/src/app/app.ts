@@ -138,7 +138,7 @@ export class App implements AfterViewInit, OnDestroy {
         if (nav && !movimentoReduzido.matches && !this.painelVisivel()) {
           const intervalo = ultimoTempo ? Math.min(tempo - ultimoTempo, 50) : 0;
           const sobFoco = nav.querySelector('.orbit-option:hover, .orbit-option:focus-visible') !== null;
-          angulo += intervalo * (Math.PI * 2 / 180_000) * (sobFoco ? .08 : 1);
+          angulo += intervalo * (Math.PI * 2 / 180_000) * (sobFoco ? 0 : 1);
           const largura = nav.clientWidth;
           const altura = nav.clientHeight;
           const celular = largura <= 650;
@@ -150,9 +150,8 @@ export class App implements AfterViewInit, OnDestroy {
             const profundidade = Math.sin(posicao);
             const x = Math.cos(posicao) * raioX;
             const y = Math.sin(posicao) * raioY;
-            const z = profundidade * (celular ? 22 : 55);
-            const escala = 1 + profundidade * .12;
-            botao.style.transform = `translate(-50%, -50%) translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px) scale(${escala.toFixed(3)})`;
+            const z = profundidade * (celular ? 7 : 12);
+            botao.style.transform = `translate(-50%, -50%) translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px)`;
             botao.style.zIndex = profundidade >= 0 ? '3' : '1';
           }
         }
@@ -200,6 +199,8 @@ export class App implements AfterViewInit, OnDestroy {
         const distancia = Math.hypot(x - (limite.left + limite.width / 2), y - (limite.top + limite.height / 2));
         const proximidade = Math.max(0, 1 - distancia / 260);
         botao.style.setProperty('--luz', (.55 + proximidade * .45).toFixed(3));
+        botao.style.setProperty('--glint-x', `${Math.max(0, Math.min(100, (x - limite.left) / limite.width * 100)).toFixed(1)}%`);
+        botao.style.setProperty('--glint-y', `${Math.max(0, Math.min(100, (y - limite.top) / limite.height * 100)).toFixed(1)}%`);
       }
     });
   }
@@ -209,6 +210,39 @@ export class App implements AfterViewInit, OnDestroy {
     const alvo = evento.currentTarget as HTMLElement;
     alvo.style.setProperty('--foco-opacidade', '0');
     for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--luz', '.55');
+  }
+
+  acionarNucleo(evento: MouseEvent): void {
+    const botao = evento.currentTarget as HTMLButtonElement;
+    const nav = botao.closest<HTMLElement>('.atom-nav');
+    if (!nav) return;
+    botao.classList.remove('core-active');
+    void botao.offsetWidth;
+    botao.classList.add('core-active');
+    window.setTimeout(() => botao.classList.remove('core-active'), 500);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    const area = nav.getBoundingClientRect();
+    const x = evento.detail === 0 ? area.width / 2 : evento.clientX - area.left;
+    const y = evento.detail === 0 ? area.height * .47 : evento.clientY - area.top;
+    const criarEfeito = (classe: string): HTMLSpanElement => {
+      const elemento = document.createElement('span');
+      elemento.className = classe;
+      elemento.setAttribute('aria-hidden', 'true');
+      elemento.style.left = `${x}px`;
+      elemento.style.top = `${y}px`;
+      elemento.addEventListener('animationend', () => elemento.remove(), { once: true });
+      nav.appendChild(elemento);
+      return elemento;
+    };
+    criarEfeito('core-ripple');
+    for (let indice = 0; indice < 24; indice++) {
+      const faisca = criarEfeito('core-spark');
+      faisca.style.setProperty('--angulo', `${indice * 15 + (Math.random() - .5) * 12}deg`);
+      faisca.style.setProperty('--distancia', `${70 + Math.random() * (area.width <= 650 ? 80 : 160)}px`);
+      faisca.style.setProperty('--atraso', `${Math.random() * 100}ms`);
+      faisca.style.setProperty('--tamanho', `${2 + Math.random() * 3}px`);
+    }
   }
   fecharPainel(): void {
     if (!this.painelVisivel() || this.painelFechando()) return;

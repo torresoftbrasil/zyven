@@ -40,6 +40,7 @@
     <app-voice-waveform />
     @if (autenticado()) {
       <nav class="atom-nav" aria-label="Módulos do Zyven">
+        <button type="button" class="core-trigger" aria-label="Acionar pulso de luz do núcleo" (click)="acionarNucleo($event)"></button>
         <span class="field-ring field-ring-a" aria-hidden="true"></span>
         <span class="field-ring field-ring-b" aria-hidden="true"></span>
         @for (modulo of modulos; track modulo.id) {
