@@ -38,7 +38,28 @@ public class FinanceiroController {
 
     @GetMapping("/resumo") FinanceiroStore.Resumo resumo() { return financeiro.resumo(); }
 
-    @GetMapping("/importacoes") List<FinanceiroStore.Importacao> importacoes() { return financeiro.importacoes(); }
+    @GetMapping("/importacoes") List<FinanceiroStore.Importacao> importacoes(@RequestParam(required = false) String termo) { return financeiro.importacoes(termo); }
+
+    @GetMapping("/lancamentos/consulta")
+    FinanceiroStore.ConsultaLancamentos consultarLancamentos(@RequestParam(required = false) String termo,
+                                                              @RequestParam(defaultValue = "0") int pagina) {
+        return financeiro.consultarLancamentos(termo, pagina);
+    }
+
+    @PatchMapping("/lancamentos/revisao/descricao")
+    FinanceiroStore.ResultadoRevisaoEmLote renomearPendentes(@Valid @RequestBody RenomeacaoTermoRequest request) {
+        return financeiro.renomearPendentesPorTermo(request.termo(), request.descricao());
+    }
+
+    @PatchMapping("/lancamentos/revisao/categoria")
+    FinanceiroStore.ResultadoRevisaoEmLote categorizarPendentes(@Valid @RequestBody CategoriaTermoRequest request) {
+        return financeiro.categorizarPendentesPorTermo(request.termo(), request.categoria());
+    }
+
+    @PostMapping("/lancamentos/revisao/confirmacao")
+    FinanceiroStore.ResultadoRevisaoEmLote confirmarPendentes(@Valid @RequestBody ConfirmacaoTermoRequest request) {
+        return financeiro.confirmarPendentesPorTermo(request.termo(), request.categoria());
+    }
 
     @PostMapping("/lancamentos/{id}/confirmacao")
     FinanceiroStore.Lancamento confirmar(@PathVariable UUID id, @Valid @RequestBody ConfirmacaoRequest request) { return financeiro.confirmar(id, request.categoria()); }
@@ -56,4 +77,10 @@ public class FinanceiroController {
     public record RegraTermoRequest(@NotBlank @Size(min = 3, max = 120) String termo,
                                    @NotBlank @Size(max = 255) String descricao,
                                    @NotNull CategoriaFinanceira categoria) { }
+    public record RenomeacaoTermoRequest(@NotBlank @Size(min = 3, max = 120) String termo,
+                                         @NotBlank @Size(max = 255) String descricao) { }
+    public record CategoriaTermoRequest(@NotBlank @Size(min = 3, max = 120) String termo,
+                                        @NotNull CategoriaFinanceira categoria) { }
+    public record ConfirmacaoTermoRequest(@NotBlank @Size(min = 3, max = 120) String termo,
+                                          CategoriaFinanceira categoria) { }
 }

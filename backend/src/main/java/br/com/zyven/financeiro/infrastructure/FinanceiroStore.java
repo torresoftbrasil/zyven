@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
 
 import br.com.zyven.financeiro.domain.CategoriaFinanceira;
 import br.com.zyven.financeiro.domain.ImportacaoDuplicadaException;
@@ -97,6 +98,59 @@ public class FinanceiroStore {
         return new ResultadoRegraEmLote(afetados, busca, nome, categoria);
     }
 
+    @Transactional
+    public ResultadoRevisaoEmLote renomearPendentesPorTermo(String termo, String descricao) {
+        String busca = validarTermo(termo);
+        String nome = validarDescricao(descricao);
+        List<LancamentoFinanceiroEntity> itens = lancamentos.pendentesPorTermo(busca);
+        if (itens.isEmpty()) return new ResultadoRevisaoEmLote(0, busca, nome, null);
+        RegraCategorizacaoFinanceiraEntity regra = regras.findByTermobusca(busca)
+                .orElseGet(() -> RegraCategorizacaoFinanceiraEntity.porTermo(busca, nome, null));
+        regra.atualizarDescricao(nome);
+        regras.save(regra);
+        for (LancamentoFinanceiroEntity item : itens) item.renomear(nome);
+        return new ResultadoRevisaoEmLote(itens.size(), busca, nome, null);
+    }
+
+    @Transactional
+    public ResultadoRevisaoEmLote categorizarPendentesPorTermo(String termo, CategoriaFinanceira categoria) {
+        String busca = validarTermo(termo);
+        if (categoria == null) throw new IllegalArgumentException("Informe uma categoria para os lançamentos selecionados");
+        List<LancamentoFinanceiroEntity> itens = lancamentos.pendentesPorTermo(busca);
+        for (LancamentoFinanceiroEntity item : itens) item.categorizarParaRevisao(categoria);
+        return new ResultadoRevisaoEmLote(itens.size(), busca, null, categoria);
+    }
+
+    @Transactional
+    public ResultadoRevisaoEmLote confirmarPendentesPorTermo(String termo, CategoriaFinanceira categoriaSolicitada) {
+        String busca = validarTermo(termo);
+        List<LancamentoFinanceiroEntity> itens = lancamentos.pendentesPorTermo(busca);
+        if (itens.isEmpty()) return new ResultadoRevisaoEmLote(0, busca, null, categoriaSolicitada);
+        CategoriaFinanceira categoria = categoriaSolicitada;
+        if (categoria == null) {
+            categoria = itens.getFirst().getCategoria();
+            CategoriaFinanceira categoriaInicial = categoria;
+            if (categoria == null || itens.stream().anyMatch(item -> item.getCategoria() != categoriaInicial)) {
+                throw new IllegalArgumentException("Os lançamentos selecionados não têm uma categoria única. Informe a categoria antes de confirmar.");
+            }
+        }
+        String descricao = itens.getFirst().getDescricao();
+        boolean descricaoUnica = itens.stream().allMatch(item -> item.getDescricao().equals(descricao));
+        RegraCategorizacaoFinanceiraEntity regra = regras.findByTermobusca(busca)
+                .orElseGet(() -> RegraCategorizacaoFinanceiraEntity.porTermo(busca, null, null));
+        regra.atualizar(categoria);
+        if (descricaoUnica) regra.atualizarDescricao(descricao);
+        regras.save(regra);
+        for (LancamentoFinanceiroEntity item : itens) item.confirmar(categoria);
+        return new ResultadoRevisaoEmLote(itens.size(), busca, descricaoUnica ? descricao : null, categoria);
+    }
+
+    private String validarTermo(String termo) {
+        String busca = chaveComparacao(termo == null ? "" : termo);
+        if (busca.length() < 3 || busca.length() > 120) throw new IllegalArgumentException("Informe um termo de 3 a 120 caracteres");
+        return busca;
+    }
+
     @Transactional(readOnly = true)
     public Resumo resumo() {
         List<Lancamento> pendentes = lancamentos.findTop20ByStatusOrderByDatalancamentoDesc("PENDENTE_REVISAO").stream().map(this::mapear).toList();
@@ -104,11 +158,30 @@ public class FinanceiroStore {
     }
 
     @Transactional(readOnly = true)
+    public ConsultaLancamentos consultarLancamentos(String termo, int pagina) {
+        if (pagina < 0 || pagina > 10000) throw new IllegalArgumentException("Página de consulta inválida");
+        String busca = termo == null || termo.isBlank() ? "" : chaveComparacao(termo);
+        if (termo != null && termo.length() > 120) throw new IllegalArgumentException("Informe um termo de até 120 caracteres");
+        var resultado = lancamentos.consultar(busca, PageRequest.of(pagina, 12, Sort.by(Sort.Direction.DESC, "datalancamento", "id")));
+        List<Lancamento> amostra = resultado.getContent().stream().map(this::mapear).map(item ->
+                new Lancamento(item.id(), item.data(), item.valor(), mascararDescricao(item.descricao()), item.categoria(), item.origemcategoria(), item.confianca(), item.status())).toList();
+        return new ConsultaLancamentos(busca, resultado.getTotalElements(), lancamentos.contarPendentes(busca), pagina, resultado.getTotalPages(), amostra);
+    }
+
+    @Transactional(readOnly = true)
     public List<Importacao> importacoes() {
+        return importacoes(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Importacao> importacoes(String termo) {
+        String busca = termo == null || termo.isBlank() ? "" : chaveComparacao(termo);
+        if (termo != null && termo.length() > 120) throw new IllegalArgumentException("Informe um termo de até 120 caracteres");
         return importacoes.findAll(Sort.by(Sort.Direction.DESC, "datacadastro")).stream().map(importacao -> {
-            List<Lancamento> itens = lancamentos.findByImportacaoidOrderByDatalancamentoDesc(importacao.getId()).stream().map(this::mapear).toList();
+            List<Lancamento> itens = lancamentos.findByImportacaoidOrderByDatalancamentoDesc(importacao.getId()).stream()
+                    .filter(item -> busca.isEmpty() || contemTermo(item.getChaveComparacao(), busca)).map(this::mapear).toList();
             return new Importacao(importacao.getId(), importacao.getNomearquivo(), importacao.getDatacadastro(), itens);
-        }).toList();
+        }).filter(importacao -> busca.isEmpty() || !importacao.lancamentos().isEmpty()).toList();
     }
 
     private Lancamento mapear(LancamentoFinanceiroEntity item) {
@@ -117,6 +190,10 @@ public class FinanceiroStore {
     private String higienizarDescricao(String descricao) {
         String texto = Normalizer.normalize(descricao == null ? "" : descricao, Normalizer.Form.NFKC).replaceAll("[\\p{Cntrl}]", " ").replaceAll("\\s+", " ").trim();
         return texto.isBlank() ? "Lançamento sem descrição" : texto.substring(0, Math.min(texto.length(), 500));
+    }
+    private String mascararDescricao(String descricao) {
+        return descricao.replaceAll("(?i)[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}", "[email]")
+                .replaceAll("\\b\\d{6,}\\b", "[numero]");
     }
     private String chaveComparacao(String descricao) {
         String chave = Normalizer.normalize(descricao, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toUpperCase(java.util.Locale.ROOT)
@@ -136,6 +213,8 @@ public class FinanceiroStore {
     public record ResultadoImportacao(UUID importacaoid, int importados, int duplicados, List<PendenteParaAnalise> pendentes) { }
     public record Lancamento(UUID id, java.time.LocalDate data, BigDecimal valor, String descricao, CategoriaFinanceira categoria, String origemcategoria, BigDecimal confianca, String status) { }
     public record Resumo(long lancados, long pendentesrevisao, List<Lancamento> pendentes) { }
+    public record ConsultaLancamentos(String termo, long total, long pendentesrevisao, int pagina, int totalpaginas, List<Lancamento> lancamentos) { }
     public record Importacao(UUID id, String nomearquivo, java.time.Instant datacadastro, List<Lancamento> lancamentos) { }
     public record ResultadoRegraEmLote(int afetados, String termo, String descricao, CategoriaFinanceira categoria) { }
+    public record ResultadoRevisaoEmLote(int afetados, String termo, String descricao, CategoriaFinanceira categoria) { }
 }

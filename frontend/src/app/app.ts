@@ -9,6 +9,7 @@ import { AutenticacaoApi } from './core/autenticacao/autenticacao-api';
 import { AcademiaApi, Treino } from './academia/academia-api';
 import { PasskeyApi } from './core/autenticacao/passkey-api';
 import { Notificacao, NotificacaoApi, PreferenciasNotificacao } from './notificacao/notificacao-api';
+import { NucleoVisual } from './shared/nucleo-visual';
 
 type ModuloId = 'inicio' | 'financeiro' | 'academia' | 'agenda' | 'tarefas' | 'integracoes';
 
@@ -68,6 +69,7 @@ export class App implements AfterViewInit, OnDestroy {
   readonly notificacoesPermitidas = signal(typeof Notification !== 'undefined' && Notification.permission === 'granted');
   readonly importacoesAbertas = signal(false);
   readonly importacoes = signal<ImportacaoFinanceira[]>([]);
+  readonly termoRevisao = signal('');
   readonly revisaoSemSugestao = computed(() => this.importacoes().flatMap(importacao => importacao.lancamentos.filter(item => item.status === 'PENDENTE_REVISAO' && !item.categoria).map(item => ({ ...item, nomearquivo: importacao.nomearquivo }))));
   readonly revisaoComSugestao = computed(() => this.importacoes().flatMap(importacao => importacao.lancamentos.filter(item => item.status === 'PENDENTE_REVISAO' && !!item.categoria).map(item => ({ ...item, nomearquivo: importacao.nomearquivo }))));
   readonly revisaoConfirmados = computed(() => this.importacoes().flatMap(importacao => importacao.lancamentos.filter(item => item.status === 'LANCADO').map(item => ({ ...item, nomearquivo: importacao.nomearquivo }))));
@@ -100,6 +102,7 @@ export class App implements AfterViewInit, OnDestroy {
   private importacaoInterval?: number;
   private focoFrame = 0;
   private orbitaFrame = 0;
+  private nucleoVisual?: NucleoVisual;
 
   constructor(
     private readonly geminiLive: GeminiLive,
@@ -118,6 +121,10 @@ export class App implements AfterViewInit, OnDestroy {
       prepararImportacao: () => this.prepararImportacao(),
       confirmarImportacao: () => this.confirmarImportacao(),
       abrirRevisao: () => this.abrirRevisaoPorVoz(),
+      consultarLancamentos: (termo, pagina) => this.consultarLancamentosPorVoz(termo, pagina),
+      renomearSelecionados: descricao => this.renomearSelecionadosPorVoz(descricao),
+      categorizarSelecionados: categoria => this.categorizarSelecionadosPorVoz(categoria),
+      confirmarSelecionados: categoria => this.confirmarSelecionadosPorVoz(categoria),
       aplicarRegra: (termo, descricao, categoria) => this.aplicarRegraPorVoz(termo, descricao, categoria),
       cancelarImportacao: () => { this.cancelarPrevia(); return 'Prévia cancelada. O arquivo continua preparado.'; },
       prepararTreinos: () => this.lerFotosTreino(),
@@ -127,6 +134,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
+    this.iniciarNucleoVisual();
     if (typeof window.matchMedia !== 'function' || typeof window.requestAnimationFrame !== 'function') return;
     this.zone.runOutsideAngular(() => {
       const fases: Record<string, number> = { financeiro: 198, academia: -18, agenda: 126, tarefas: 54, integracoes: -90 };
@@ -144,6 +152,8 @@ export class App implements AfterViewInit, OnDestroy {
           const celular = largura <= 650;
           const raioX = celular ? Math.min(largura * .3, 130) : Math.min(largura * .37, 900);
           const raioY = celular ? Math.min(altura * .12, 118) : Math.min(altura * .29, 280);
+          nav.style.setProperty('--orbita-diametro-x', `${raioX * 2}px`);
+          nav.style.setProperty('--orbita-diametro-y', `${raioY * 2}px`);
           for (const botao of nav.querySelectorAll<HTMLElement>('.orbit-option')) {
             const fase = fases[botao.dataset['module'] ?? ''] ?? 0;
             const posicao = angulo + fase * Math.PI / 180;
@@ -162,7 +172,18 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
+  private iniciarNucleoVisual(): void {
+    if (this.nucleoVisual) return;
+    const nav = document.querySelector<HTMLElement>('.atom-nav');
+    const canvas = nav?.querySelector<HTMLCanvasElement>('.nucleus-canvas');
+    if (nav && canvas) {
+      try { this.nucleoVisual = new NucleoVisual(canvas); nav.classList.add('canvas-ready'); }
+      catch { /* O núcleo CSS permanece como alternativa se canvas estiver indisponível. */ }
+    }
+  }
+
   ngOnDestroy(): void {
+    this.nucleoVisual?.destruir();
     cancelAnimationFrame(this.focoFrame);
     cancelAnimationFrame(this.orbitaFrame);
     clearInterval(this.clockInterval);
@@ -220,29 +241,10 @@ export class App implements AfterViewInit, OnDestroy {
     void botao.offsetWidth;
     botao.classList.add('core-active');
     window.setTimeout(() => botao.classList.remove('core-active'), 500);
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
     const area = nav.getBoundingClientRect();
-    const x = evento.detail === 0 ? area.width / 2 : evento.clientX - area.left;
-    const y = evento.detail === 0 ? area.height * .47 : evento.clientY - area.top;
-    const criarEfeito = (classe: string): HTMLSpanElement => {
-      const elemento = document.createElement('span');
-      elemento.className = classe;
-      elemento.setAttribute('aria-hidden', 'true');
-      elemento.style.left = `${x}px`;
-      elemento.style.top = `${y}px`;
-      elemento.addEventListener('animationend', () => elemento.remove(), { once: true });
-      nav.appendChild(elemento);
-      return elemento;
-    };
-    criarEfeito('core-ripple');
-    for (let indice = 0; indice < 24; indice++) {
-      const faisca = criarEfeito('core-spark');
-      faisca.style.setProperty('--angulo', `${indice * 15 + (Math.random() - .5) * 12}deg`);
-      faisca.style.setProperty('--distancia', `${70 + Math.random() * (area.width <= 650 ? 80 : 160)}px`);
-      faisca.style.setProperty('--atraso', `${Math.random() * 100}ms`);
-      faisca.style.setProperty('--tamanho', `${2 + Math.random() * 3}px`);
-    }
+    const x = evento.detail === 0 ? area.left + area.width / 2 : evento.clientX;
+    const y = evento.detail === 0 ? area.top + area.height * .47 : evento.clientY;
+    this.nucleoVisual?.disparar(x, y);
   }
   fecharPainel(): void {
     if (!this.painelVisivel() || this.painelFechando()) return;
@@ -285,9 +287,12 @@ export class App implements AfterViewInit, OnDestroy {
 
   sair(): void {
     void this.autenticacaoApi.sair().finally(() => {
+      this.nucleoVisual?.destruir();
+      this.nucleoVisual = undefined;
       this.autenticado.set(false);
       this.usuario.set('');
       this.arquivoPreparado.set(null);
+      this.termoRevisao.set('');
       this.previaOfx.set(null);
       this.notificacoes.set([]);
       this.cadastroFaceId.set(false);
@@ -576,6 +581,50 @@ export class App implements AfterViewInit, OnDestroy {
     return mensagem;
   }
 
+  private async consultarLancamentosPorVoz(termo: string, pagina: number): Promise<string> {
+    const consulta = await this.financeiroApi.consultarLancamentos(termo, pagina);
+    if (consulta.termo && consulta.total > 0) {
+      this.termoRevisao.set(consulta.termo);
+      this.selecionarModulo('financeiro', undefined, false);
+      await this.abrirImportacoes();
+    } else if (!consulta.termo) {
+      this.termoRevisao.set('');
+      if (this.importacoesAbertas()) await this.carregarImportacoes();
+    }
+    const cabecalho = `${consulta.total} lançamento(s) salvo(s)${consulta.termo ? ` com “${consulta.termo}”` : ''}; ${consulta.pendentesrevisao} pendente(s) de revisão. Página ${consulta.pagina + 1} de ${Math.max(1, consulta.totalpaginas)}.`;
+    if (!consulta.lancamentos.length) return `${cabecalho} Nenhum lançamento nesta página.`;
+    const itens = consulta.lancamentos.map(item => `${item.data}: ${item.descricao}, ${this.formatarValor(item.valor)}, ${item.categoria ? this.rotuloCategoria(item.categoria) : 'sem categoria'}, ${item.status === 'LANCADO' ? 'confirmado' : 'pendente'}.`);
+    return `${cabecalho}\n${itens.join('\n')}`;
+  }
+
+  private async renomearSelecionadosPorVoz(descricao: string): Promise<string> {
+    const termo = this.termoRevisao();
+    if (!termo) return 'Primeiro peça para localizar os lançamentos por um termo, como Uber.';
+    const resultado = await this.financeiroApi.renomearPendentes(termo, descricao);
+    await this.carregarImportacoes();
+    return `${resultado.afetados} lançamento(s) pendente(s) com ${termo} renomeado(s) para ${descricao}. A tela foi atualizada; ainda aguardam confirmação.`;
+  }
+
+  private async categorizarSelecionadosPorVoz(categoria: string): Promise<string> {
+    const termo = this.termoRevisao();
+    if (!termo) return 'Primeiro peça para localizar os lançamentos por um termo, como Uber.';
+    if (!this.categorias.some(item => item.valor === categoria)) return 'Informe uma categoria financeira válida.';
+    const resultado = await this.financeiroApi.categorizarPendentes(termo, categoria as CategoriaFinanceira);
+    await this.carregarImportacoes();
+    return `${resultado.afetados} lançamento(s) pendente(s) com ${termo} classificado(s) como ${this.rotuloCategoria(categoria as CategoriaFinanceira)}. A tela foi atualizada; ainda aguardam confirmação.`;
+  }
+
+  private async confirmarSelecionadosPorVoz(categoria: string): Promise<string> {
+    const termo = this.termoRevisao();
+    if (!termo) return 'Primeiro peça para localizar os lançamentos por um termo, como Uber.';
+    if (categoria && !this.categorias.some(item => item.valor === categoria)) return 'Informe uma categoria financeira válida.';
+    const resultado = await this.financeiroApi.confirmarPendentes(termo, categoria ? categoria as CategoriaFinanceira : undefined);
+    await Promise.all([this.carregarFinanceiro(), this.carregarImportacoes()]);
+    return `${resultado.afetados} lançamento(s) com ${termo} confirmado(s) como gastos em ${this.rotuloCategoria(resultado.categoria)}. A regra será usada nos próximos extratos. A tela foi atualizada.`;
+  }
+
+  limparFiltroRevisao(): void { this.termoRevisao.set(''); void this.carregarImportacoes(); }
+
   async abrirImportacoes(): Promise<void> {
     this.financeiroErro.set('');
     this.importacoesAbertas.set(true);
@@ -584,7 +633,7 @@ export class App implements AfterViewInit, OnDestroy {
   fecharImportacoes(): void { this.importacoesAbertas.set(false); }
   fecharImportacoesExterno(evento: MouseEvent): void { if (evento.target === evento.currentTarget) this.fecharImportacoes(); }
   private async carregarImportacoes(): Promise<void> {
-    try { this.importacoes.set(await this.financeiroApi.importacoes()); }
+    try { this.importacoes.set(await this.financeiroApi.importacoes(this.termoRevisao())); }
     catch { this.financeiroErro.set('Não foi possível carregar as importações.'); }
   }
 
@@ -693,6 +742,7 @@ export class App implements AfterViewInit, OnDestroy {
   private iniciarSessao(login: string): void {
     this.usuario.set(login);
     this.autenticado.set(true);
+    requestAnimationFrame(() => this.iniciarNucleoVisual());
     this.iniciarVoz();
     void this.avaliarNotificacoes();
     const parametros = new URLSearchParams(window.location.search);

@@ -40,9 +40,11 @@
     <app-voice-waveform />
     @if (autenticado()) {
       <nav class="atom-nav" aria-label="Módulos do Zyven">
+        <canvas class="nucleus-canvas" aria-hidden="true"></canvas>
         <button type="button" class="core-trigger" aria-label="Acionar pulso de luz do núcleo" (click)="acionarNucleo($event)"></button>
         <span class="field-ring field-ring-a" aria-hidden="true"></span>
         <span class="field-ring field-ring-b" aria-hidden="true"></span>
+        <span class="orbit-track" aria-hidden="true"></span>
         @for (modulo of modulos; track modulo.id) {
           @if (modulo.id !== 'inicio') {
             <button type="button" class="orbit-option" [class.active]="moduloAtivo() === modulo.id" [attr.data-module]="modulo.id" [attr.aria-label]="'Abrir ' + modulo.nome" (click)="selecionarModulo(modulo.id)">
@@ -64,7 +66,7 @@
         @if (arquivoPreparado(); as arquivo) { <div class="staged-file" role="status"><span>OFX PREPARADO <strong>{{ arquivo.name }}</strong></span><button type="button" (click)="arquivoPreparado.set(null)" aria-label="Remover arquivo preparado">×</button></div> }
         @if (fotosPreparadas().length) { <div class="staged-file" role="status"><span>FOTOS PREPARADAS <strong>{{ fotosPreparadas().length }} para leitura de treinos</strong></span><button type="button" (click)="fotosPreparadas.set([]); previaTreinos.set([])" aria-label="Remover fotos preparadas">×</button></div> }
         <div class="input-switch" role="group" aria-label="Modo de interação">
-          <button type="button" [class.active]="modoEntrada() === 'VOZ'" [attr.aria-pressed]="modoEntrada() === 'VOZ'" (click)="iniciarVoz()">{{ audioState.connected() && audioState.listening() ? 'VOZ ATIVA' : 'INICIAR VOZ' }}</button>
+          <button type="button" [class.active]="modoEntrada() === 'VOZ'" [attr.aria-pressed]="modoEntrada() === 'VOZ'" (click)="iniciarVoz()">{{ audioState.status() === 'AGUARDANDO ZYVEN' ? 'AGUARDANDO ZYVEN' : audioState.connected() && audioState.listening() ? 'VOZ ATIVA' : 'INICIAR VOZ' }}</button>
           <button type="button" [class.active]="modoEntrada() === 'TEXTO'" [attr.aria-pressed]="modoEntrada() === 'TEXTO'" (click)="usarTexto()">DIGITAR</button>
         </div>
         <div class="attachment-control"><button type="button" class="attachment-trigger" aria-label="Adicionar arquivo ou foto" [attr.aria-expanded]="menuAnexosAberto()" (click)="menuAnexosAberto.set(!menuAnexosAberto())">+</button>@if (menuAnexosAberto()) { <div class="attachment-menu"><label>ESCOLHER ARQUIVO<input type="file" accept=".ofx,image/*" multiple (change)="escolherAnexo($event)"></label><label>TIRAR FOTO<input type="file" accept="image/*" capture="environment" (change)="escolherAnexo($event)"></label></div> }</div>
@@ -157,8 +159,9 @@
   <div class="import-modal-backdrop" role="presentation" (click)="fecharImportacoesExterno($event)">
     <section class="import-modal" role="dialog" aria-modal="true" aria-labelledby="tituloImportacoes">
       <div class="import-scan" aria-hidden="true"></div>
-      <header><div><span>FINANCEIRO // REVISÃO</span><h2 id="tituloImportacoes">Importações</h2><small class="import-voice-status">{{ audioState.connected() && audioState.listening() ? '● VOZ ATIVA · DIGA ZYVEN PARA NOVOS COMANDOS' : 'VOZ DISPONÍVEL NA TELA PRINCIPAL' }}</small></div><button type="button" aria-label="Fechar importações" (click)="fecharImportacoes()">×</button></header>
+      <header><div><span>FINANCEIRO // REVISÃO</span><h2 id="tituloImportacoes">Importações</h2><small class="import-voice-status">{{ audioState.status() === 'AGUARDANDO ZYVEN' ? '● EM ESPERA · DIGA ZYVEN PARA RETOMAR' : audioState.connected() && audioState.listening() ? '● VOZ ATIVA · DIGA ZYVEN PARA NOVOS COMANDOS' : 'VOZ DISPONÍVEL NA TELA PRINCIPAL' }}</small></div><button type="button" aria-label="Fechar importações" (click)="fecharImportacoes()">×</button></header>
       <p>Confirme as sugestões da IA, ajuste descrições e categorias, ou crie uma regra por termo. A voz continua ativa durante a revisão.</p>
+      @if (termoRevisao()) { <div class="review-filter" role="status"><span>SELEÇÃO ATIVA · {{ termoRevisao() }}</span><button type="button" (click)="limparFiltroRevisao()">VER TODOS</button></div> }
       <div class="import-command"><button type="button" (click)="modoEntrada() === 'VOZ' ? usarTexto() : iniciarVoz()">{{ modoEntrada() === 'VOZ' ? 'DIGITAR COMANDO' : 'VOLTAR À VOZ' }}</button>@if (modoEntrada() === 'TEXTO') { <form (submit)="enviarComando($event)"><input [formControl]="comando" aria-label="Comando para Zyven durante a revisão" placeholder="Peça um ajuste, por exemplo: Zyven, coloque Uber em Transporte"><button type="submit">ENVIAR</button></form> }</div>
       @if (respostaTexto()) { <p class="import-command-response" role="status">{{ respostaTexto() }}</p> }
       <form class="bulk-rule-form" (submit)="aplicarRegraManual($event)"><label>CONTÉM<input name="termo" minlength="3" maxlength="120" required placeholder="Ex.: uber"></label><label>DESCRIÇÃO PADRÃO<input name="descricao" maxlength="255" required placeholder="Ex.: Uber"></label><label>CATEGORIA<select name="categoria" required><option value="">Selecione</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor">{{ categoria.rotulo }}</option> }</select></label><button type="submit">APLICAR A TODOS</button></form>

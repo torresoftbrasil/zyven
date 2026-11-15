@@ -78,5 +78,6 @@ class LancamentoFinanceiroEntity {
     String getOrigemCategoria() { return origemcategoria; } BigDecimal getConfianca() { return confianca; } String getStatus() { return status; }
     void sugerir(CategoriaFinanceira categoria, BigDecimal confianca) { this.categoria = categoria; this.confianca = confianca; origemcategoria = "IA"; dataatualizacao = Instant.now(); }
     void confirmar(CategoriaFinanceira categoria) { this.categoria = categoria; confianca = BigDecimal.ONE; origemcategoria = "REGRA"; status = "LANCADO"; dataatualizacao = Instant.now(); }
+    void categorizarParaRevisao(CategoriaFinanceira categoria) { this.categoria = categoria; confianca = null; origemcategoria = "REVISAO"; dataatualizacao = Instant.now(); }
     void renomear(String descricao) { this.descricao = descricao; dataatualizacao = Instant.now(); }
 }

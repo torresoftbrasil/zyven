@@ -11,10 +11,24 @@ interface SessaoLiveResponse {
   conversaid: string;
 }
 
+interface ResultadoReconhecimento { isFinal: boolean; 0: { transcript: string } }
+interface EventoReconhecimento { resultIndex: number; results: ArrayLike<ResultadoReconhecimento> }
+interface ReconhecimentoVoz {
+  lang: string; continuous: boolean; interimResults: boolean;
+  onresult: ((evento: EventoReconhecimento) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((evento: { error: string }) => void) | null;
+  start(): void; stop(): void;
+}
+
 export interface AcoesFinanceirasVoz {
   prepararImportacao(): Promise<string>;
   confirmarImportacao(): string;
   abrirRevisao(): Promise<string>;
+  consultarLancamentos(termo: string, pagina: number): Promise<string>;
+  renomearSelecionados(descricao: string): Promise<string>;
+  categorizarSelecionados(categoria: string): Promise<string>;
+  confirmarSelecionados(categoria: string): Promise<string>;
   aplicarRegra(termo: string, descricao: string, categoria: string): Promise<string>;
   cancelarImportacao(): string;
   prepararTreinos(): Promise<string>;
@@ -51,6 +65,10 @@ export class GeminiLive {
   private treinoConfirmacaoLiberada = false;
   private modulo = 'inicio';
   private conexaoGeracao = 0;
+  private pausaPendente = false;
+  private emEspera = false;
+  private reconhecimento?: ReconhecimentoVoz;
+  private comandoDaChamada = '';
 
   constructor(private readonly http: HttpClient, private readonly audioState: ZyvenAudioState) {}
 
@@ -68,6 +86,8 @@ export class GeminiLive {
   }
 
   async connect(modo: 'VOZ' | 'TEXTO' = 'VOZ'): Promise<void> {
+    this.emEspera = false;
+    this.pararReconhecimento();
     this.modo = modo;
     this.erro.set('');
     if (modo === 'VOZ') this.audioState.status.set('CONECTANDO');
@@ -119,7 +139,12 @@ export class GeminiLive {
           { name: 'confirmarImportacaoOfx', description: 'Inicia a importação SOMENTE depois de o usuário responder afirmativamente à pergunta sobre a prévia. Não use na mesma fala em que solicitou a prévia.', parametersJsonSchema: { type: 'object', properties: {} } },
           { name: 'cancelarImportacaoOfx', description: 'Cancela a prévia quando o usuário responder negativamente. O arquivo continua preparado.', parametersJsonSchema: { type: 'object', properties: {} } },
           { name: 'abrirRevisaoOfx', description: 'Abre o popup de revisão financeira quando o usuário pedir ou aceitar revisar. A voz continua ativa.', parametersJsonSchema: { type: 'object', properties: {} } },
+          { name: 'consultarLancamentosFinanceiros', description: 'Consulta os lançamentos de OFX já processados e salvos no banco, inclusive os pendentes de revisão. Use para responder perguntas sobre o que foi importado, conferir estabelecimentos ou examinar registros antes de alterar. Não depende de arquivo anexado. Sem termo retorna contagem e os 12 mais recentes; com termo busca pelo texto original. Use pagina 1, 2 etc. para percorrer outros resultados.', parametersJsonSchema: { type: 'object', properties: { termo: { type: 'string', description: 'Palavra ou expressão do estabelecimento. Omita para visão geral.' }, pagina: { type: 'integer', description: 'Página começando em zero; omita para a primeira.' } } } },
+          { name: 'renomearLancamentosSelecionados', description: 'Durante a revisão, altera só a descrição dos lançamentos pendentes selecionados pela última consulta com termo. Atualiza a tela imediatamente, mas NÃO confirma como gastos. Use quando o usuário pedir para mudar o nome/descrição e ainda quiser continuar conferindo.', parametersJsonSchema: { type: 'object', properties: { descricao: { type: 'string' } }, required: ['descricao'] } },
+          { name: 'categorizarLancamentosSelecionados', description: 'Durante a revisão, define a categoria dos lançamentos pendentes selecionados pela última consulta com termo. Atualiza a tela, mas mantém pendentes até o usuário mandar importar/confirmar.', parametersJsonSchema: { type: 'object', properties: { categoria: { type: 'string', enum: ['ALIMENTACAO', 'MORADIA', 'TRANSPORTE', 'SAUDE', 'LAZER', 'ASSINATURAS', 'EDUCACAO', 'COMPRAS', 'TARIFAS', 'TRANSFERENCIAS', 'RECEITAS', 'OUTROS'] } }, required: ['categoria'] } },
+          { name: 'confirmarLancamentosSelecionados', description: 'Confirma como gastos somente os lançamentos ainda pendentes selecionados pela última consulta com termo, após o usuário pedir explicitamente para importar/confirmar aquele grupo. Se já houver uma categoria única nas sugestões ou ajustes, omita categoria; caso contrário peça ao usuário uma categoria antes. Salva a regra para próximos extratos.', parametersJsonSchema: { type: 'object', properties: { categoria: { type: 'string', enum: ['ALIMENTACAO', 'MORADIA', 'TRANSPORTE', 'SAUDE', 'LAZER', 'ASSINATURAS', 'EDUCACAO', 'COMPRAS', 'TARIFAS', 'TRANSFERENCIAS', 'RECEITAS', 'OUTROS'] } } } },
           { name: 'aplicarRegraFinanceira', description: 'Aplica uma regra em lote aos lançamentos cujo texto original contenha um termo, definindo descrição e categoria para agora e futuras importações. Use apenas quando o usuário especificar claramente termo, descrição e categoria.', parametersJsonSchema: { type: 'object', properties: { termo: { type: 'string' }, descricao: { type: 'string' }, categoria: { type: 'string', enum: ['ALIMENTACAO', 'MORADIA', 'TRANSPORTE', 'SAUDE', 'LAZER', 'ASSINATURAS', 'EDUCACAO', 'COMPRAS', 'TARIFAS', 'TRANSFERENCIAS', 'RECEITAS', 'OUTROS'] } }, required: ['termo', 'descricao', 'categoria'] } },
+          { name: 'pausarAteChamada', description: 'Quando Tuco disser "nada por enquanto", "pode descansar" ou pedir para parar temporariamente: encerra a conversa ativa e fica aguardando a palavra Zyven para retomar. Não use para pausas normais entre frases.', parametersJsonSchema: { type: 'object', properties: {} } },
           { name: 'lerFotosTreino', description: 'Lê as fotos de treino preparadas e apresenta uma prévia. Pergunte se pode importar; aguarde resposta em nova fala.', parametersJsonSchema: { type: 'object', properties: {} } },
           { name: 'confirmarTreinos', description: 'Importa os treinos extraídos das fotos somente após a confirmação explícita do usuário.', parametersJsonSchema: { type: 'object', properties: {} } },
           { name: 'moverTreino', description: 'Move o treino de um dia da semana para hoje ou data explícita, somente quando o usuário pedir. Origem por exemplo sexta; destino hoje ou AAAA-MM-DD.', parametersJsonSchema: { type: 'object', properties: { origem: { type: 'string' }, destino: { type: 'string' } }, required: ['origem', 'destino'] } },
@@ -140,6 +165,8 @@ export class GeminiLive {
   }
 
   usarTexto(): void {
+    this.emEspera = false;
+    this.pararReconhecimento();
     this.modo = 'TEXTO';
     this.stopMicrophone();
     this.stopPlayback();
@@ -155,6 +182,9 @@ export class GeminiLive {
   }
 
   async disconnect(): Promise<void> {
+    this.emEspera = false;
+    this.pausaPendente = false;
+    this.pararReconhecimento();
     this.conexaoGeracao++;
     this.stopMicrophone();
     this.stopPlayback();
@@ -220,6 +250,11 @@ export class GeminiLive {
           ? 'Permita o acesso ao microfone no navegador para usar a voz.'
           : 'Não foi possível acessar o microfone. Verifique o dispositivo e tente novamente.');
       });
+      if (this.comandoDaChamada && this.session) {
+        const comando = this.comandoDaChamada;
+        this.comandoDaChamada = '';
+        this.session.sendClientContent({ turns: [{ role: 'user', parts: [{ text: comando }] }], turnComplete: true });
+      }
     }
     if (message.toolCall?.functionCalls) void this.responderFerramentas(message.toolCall.functionCalls);
     if (message.serverContent?.interrupted) this.stopPlayback();
@@ -247,6 +282,7 @@ export class GeminiLive {
       if (!message.toolCall && this.treinoAguardandoPergunta) this.treinoConfirmacaoLiberada = true;
       this.turnoConcluido = true;
       this.finalizarReproducao();
+      if (this.pausaPendente && this.playbackSources.size === 0) void this.entrarEmEspera();
     }
   }
 
@@ -280,7 +316,12 @@ export class GeminiLive {
             this.revisaoAguardandoPergunta = false;
             this.revisaoLiberada = false;
             break;
+          case 'consultarLancamentosFinanceiros': resultado = await this.acoesFinanceiras.consultarLancamentos(String(argumentos['termo'] ?? ''), Number(argumentos['pagina'] ?? 0)); break;
+          case 'renomearLancamentosSelecionados': resultado = await this.acoesFinanceiras.renomearSelecionados(String(argumentos['descricao'] ?? '')); break;
+          case 'categorizarLancamentosSelecionados': resultado = await this.acoesFinanceiras.categorizarSelecionados(String(argumentos['categoria'] ?? '')); break;
+          case 'confirmarLancamentosSelecionados': resultado = await this.acoesFinanceiras.confirmarSelecionados(String(argumentos['categoria'] ?? '')); break;
           case 'aplicarRegraFinanceira': resultado = await this.acoesFinanceiras.aplicarRegra(String(argumentos['termo'] ?? ''), String(argumentos['descricao'] ?? ''), String(argumentos['categoria'] ?? '')); break;
+          case 'pausarAteChamada': resultado = 'Certo, Tuco. Vou aguardar você me chamar de Zyven.'; this.pausaPendente = true; break;
           case 'lerFotosTreino':
             resultado = await this.acoesFinanceiras.prepararTreinos();
             this.treinoAguardandoPergunta = true;
@@ -357,6 +398,73 @@ export class GeminiLive {
     this.audioState.listening.set(this.modo === 'VOZ' && !!this.microphone);
     this.audioState.status.set(this.modo === 'VOZ' ? 'OUVINDO' : 'MODO TEXTO');
     this.audioState.outputLevel.set(0);
+    if (this.pausaPendente) void this.entrarEmEspera();
+  }
+
+  private async entrarEmEspera(): Promise<void> {
+    if (!this.pausaPendente) return;
+    this.pausaPendente = false;
+    const conversa = this.conversaId;
+    await this.disconnect();
+    this.conversaId = conversa;
+    this.emEspera = true;
+    this.audioState.status.set('AGUARDANDO ZYVEN');
+    this.iniciarReconhecimento();
+  }
+
+  private iniciarReconhecimento(): void {
+    const navegador = window as unknown as { SpeechRecognition?: new () => ReconhecimentoVoz; webkitSpeechRecognition?: new () => ReconhecimentoVoz };
+    const Construtor = navegador.SpeechRecognition ?? navegador.webkitSpeechRecognition;
+    if (!Construtor) {
+      this.audioState.status.set('PAUSADO · TOQUE PARA RETOMAR');
+      return;
+    }
+    const reconhecimento = new Construtor();
+    reconhecimento.lang = 'pt-BR';
+    reconhecimento.continuous = true;
+    reconhecimento.interimResults = false;
+    reconhecimento.onresult = evento => {
+      for (let indice = evento.resultIndex; indice < evento.results.length; indice++) {
+        const resultado = evento.results[indice];
+        if (!resultado.isFinal) continue;
+        const texto = resultado[0].transcript.trim();
+        const chamada = /\b(?:zyven|ziven|ziveno|zeiven)\b/i.exec(texto);
+        if (!chamada || !this.emEspera) continue;
+        this.emEspera = false;
+        this.pararReconhecimento();
+        const pedido = texto.slice(chamada.index + chamada[0].length).trim();
+        this.comandoDaChamada = pedido ? `Zyven, ${pedido}` : '';
+        void this.connect('VOZ').catch(() => {
+          this.audioState.status.set('VOZ INDISPONÍVEL');
+          this.erro.set('Não foi possível retomar a voz. Toque em INICIAR VOZ para tentar novamente.');
+        });
+        break;
+      }
+    };
+    reconhecimento.onend = () => {
+      if (this.emEspera && this.reconhecimento === reconhecimento) {
+        window.setTimeout(() => { if (this.emEspera && this.reconhecimento === reconhecimento) this.iniciarReconhecimento(); }, 350);
+      }
+    };
+    reconhecimento.onerror = evento => {
+      if (evento.error === 'no-speech') return;
+      this.reconhecimento = undefined;
+      this.audioState.status.set('PAUSADO · TOQUE PARA RETOMAR');
+    };
+    this.reconhecimento = reconhecimento;
+    try { reconhecimento.start(); }
+    catch { this.audioState.status.set('PAUSADO · TOQUE PARA RETOMAR'); }
+  }
+
+  private pararReconhecimento(): void {
+    const reconhecimento = this.reconhecimento;
+    this.reconhecimento = undefined;
+    if (reconhecimento) {
+      reconhecimento.onend = null;
+      reconhecimento.onresult = null;
+      reconhecimento.onerror = null;
+      try { reconhecimento.stop(); } catch { /* O reconhecimento já pode ter terminado. */ }
+    }
   }
 
   private ensureOutputAudio(): AudioContext {

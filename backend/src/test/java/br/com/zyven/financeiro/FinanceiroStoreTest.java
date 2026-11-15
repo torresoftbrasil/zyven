@@ -73,4 +73,51 @@ class FinanceiroStoreTest {
         assertThat(futuro.descricao()).isEqualTo("Nome preferido");
         assertThat(futuro.categoria()).isNull();
     }
+
+    @Test
+    void consultaLancamentosPersistidosPorTermoComTotalEPaginacao() {
+        String referencia = UUID.randomUUID().toString();
+        String termo = "CONSULTATEST" + referencia.substring(0, 8).toUpperCase();
+        financeiro.salvarImportacao("consulta.ofx", referencia + "-consulta", List.of(
+                new TransacaoOfx(referencia, "1", LocalDate.now(), new BigDecimal("-12.00"), termo + " VIAGEM 123456789"),
+                new TransacaoOfx(referencia, "2", LocalDate.now(), new BigDecimal("-18.00"), termo + " VIAGEM 2")));
+
+        var consulta = financeiro.consultarLancamentos(termo.toLowerCase(), 0);
+        assertThat(consulta.total()).isEqualTo(2);
+        assertThat(consulta.pendentesrevisao()).isEqualTo(2);
+        assertThat(consulta.lancamentos()).hasSize(2);
+        assertThat(consulta.lancamentos().getFirst().descricao()).doesNotContain("123456789");
+        assertThat(financeiro.consultarLancamentos(termo, 1).lancamentos()).isEmpty();
+    }
+
+    @Test
+    void revisaGrupoEmEtapasEConfirmaSomenteDepoisDoPedido() {
+        String referencia = UUID.randomUUID().toString();
+        String termo = "ETAPATEST" + referencia.substring(0, 8).toUpperCase();
+        var importacao = financeiro.salvarImportacao("etapas.ofx", referencia + "-etapas", List.of(
+                new TransacaoOfx(referencia, "1", LocalDate.now(), new BigDecimal("-12.00"), termo + " CORRIDA 1"),
+                new TransacaoOfx(referencia, "2", LocalDate.now(), new BigDecimal("-18.00"), termo + " CORRIDA 2"),
+                new TransacaoOfx(referencia, "3", LocalDate.now(), new BigDecimal("-8.00"), "OUTRO LOCAL")));
+
+        assertThat(financeiro.renomearPendentesPorTermo(termo, "Uber").afetados()).isEqualTo(2);
+        assertThat(financeiro.categorizarPendentesPorTermo(termo, CategoriaFinanceira.TRANSPORTE).afetados()).isEqualTo(2);
+        var emRevisao = financeiro.importacoes(termo).getFirst().lancamentos();
+        assertThat(emRevisao).hasSize(2).allSatisfy(item -> {
+            assertThat(item.descricao()).isEqualTo("Uber");
+            assertThat(item.categoria()).isEqualTo(CategoriaFinanceira.TRANSPORTE);
+            assertThat(item.status()).isEqualTo("PENDENTE_REVISAO");
+        });
+
+        assertThat(financeiro.confirmarPendentesPorTermo(termo, null).afetados()).isEqualTo(2);
+        var confirmados = financeiro.importacoes(termo).getFirst().lancamentos();
+        assertThat(confirmados).allSatisfy(item -> assertThat(item.status()).isEqualTo("LANCADO"));
+        assertThat(financeiro.importacoes().stream().filter(item -> item.id().equals(importacao.importacaoid())).findFirst().orElseThrow()
+                .lancamentos().stream().filter(item -> item.descricao().equals("OUTRO LOCAL")).findFirst().orElseThrow().status()).isEqualTo("PENDENTE_REVISAO");
+
+        var futura = financeiro.salvarImportacao("futuro.ofx", referencia + "-futuro", List.of(
+                new TransacaoOfx(referencia, "4", LocalDate.now(), new BigDecimal("-23.00"), termo + " CORRIDA 4")));
+        assertThat(futura.pendentes()).isEmpty();
+        assertThat(financeiro.importacoes(termo).stream().flatMap(item -> item.lancamentos().stream())
+                .filter(item -> item.valor().compareTo(new BigDecimal("-23.00")) == 0).findFirst().orElseThrow().descricao()).isEqualTo("Uber");
+    }
 }
