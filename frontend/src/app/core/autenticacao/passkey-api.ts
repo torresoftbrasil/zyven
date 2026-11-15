@@ -5,8 +5,13 @@ interface AutenticacaoOpcoes { challenge: string; rpId?: string; timeout?: numbe
 
 @Injectable({ providedIn: 'root' })
 export class PasskeyApi {
+  private readonly chaveDispositivo = 'zyven.passkey.dispositivo';
   readonly disponivel = typeof window !== 'undefined' && window.isSecureContext && 'PublicKeyCredential' in window;
   readonly instalado = typeof window !== 'undefined' && ((typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) || (navigator as Navigator & { standalone?: boolean }).standalone === true);
+
+  temChaveNesteDispositivo(): boolean {
+    return this.disponivel && localStorage.getItem(this.chaveDispositivo) !== null;
+  }
 
   async registrar(): Promise<void> {
     const resposta = await fetch('/webauthn/register/options', { method: 'POST', credentials: 'same-origin' });
@@ -27,15 +32,19 @@ export class PasskeyApi {
       clientExtensionResults: credencial.getClientExtensionResults(), authenticatorAttachment: 'platform',
     }, label: 'Zyven neste dispositivo' } }) });
     if (!registro.ok) throw new Error('Não foi possível salvar a credencial neste dispositivo.');
+    localStorage.setItem(this.chaveDispositivo, credencial.id);
   }
 
-  async entrar(): Promise<void> {
+  async entrar(somenteNesteDispositivo = false): Promise<void> {
     const resposta = await fetch('/webauthn/authenticate/options', { method: 'POST', credentials: 'same-origin' });
     if (!resposta.ok) throw new Error('Não foi possível preparar a autenticação facial.');
     const opcoes = await resposta.json() as AutenticacaoOpcoes;
+    const idLocal = somenteNesteDispositivo ? localStorage.getItem(this.chaveDispositivo) : null;
     const credencial = await navigator.credentials.get({ publicKey: {
       ...opcoes, challenge: this.decodificar(opcoes.challenge),
-      allowCredentials: opcoes.allowCredentials?.map(item => ({ ...item, id: this.decodificar(item.id) })),
+      allowCredentials: idLocal
+        ? [{ type: 'public-key', id: this.decodificar(idLocal), transports: ['internal'] }]
+        : opcoes.allowCredentials?.map(item => ({ ...item, id: this.decodificar(item.id) })),
       userVerification: 'required',
     } }) as PublicKeyCredential | null;
     if (!credencial) throw new Error('Autenticação cancelada.');

@@ -49,7 +49,11 @@ Migrações pelo IntelliJ: execute `br.com.zyven.MigrationApplication`.
 O build de produção inclui manifesto e service worker. No Safari do iPhone,
 abra o endereço HTTPS do Zyven e escolha **Compartilhar > Adicionar à Tela de
 Início**. Depois do primeiro login com usuário e senha, o app instalado oferece
-o cadastro de uma passkey do dispositivo. Face ID ou outro método de verificação
+o cadastro de uma chave de acesso: toque em **Criar chave neste iPhone** e
+confirme o salvamento no app Senhas. A entrada por Face ID aparece após esse
+cadastro. O app tenta iniciá-la quando a sessão expirar; se o Safari exigir um
+toque, use **Entrar com Face ID**. A sessão permanece ativa por até 30 dias sem
+uso e sobrevive a reinícios do servidor. Face ID ou outro método de verificação
 fica sob controle do sistema operacional. Configure `ZYVEN_WEBAUTHN_RPID` e
 `ZYVEN_WEBAUTHN_ORIGIN` no servidor para o domínio HTTPS utilizado. A variável
 `ZYVEN_USUARIO_SENHAHASH` recebe somente o hash BCrypt da senha inicial; nunca

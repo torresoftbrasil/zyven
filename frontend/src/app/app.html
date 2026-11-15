@@ -12,26 +12,50 @@
     <h1 id="tituloAcesso">Identifique-se</h1>
     <p>Entre com suas credenciais para iniciar o ambiente pessoal.</p>
     <form (submit)="entrar($event)">
-      <label>LOGIN<input name="login" autocomplete="username" required maxlength="120" autofocus></label>
+      <label>LOGIN<input name="login" autocomplete="username webauthn" required maxlength="120" autofocus></label>
       <label>SENHA<input name="senha" type="password" autocomplete="current-password" required maxlength="200"></label>
       @if (loginErro()) { <p class="login-error" role="alert">{{ loginErro() }}</p> }
       <button type="submit" [disabled]="autenticando()">{{ autenticando() ? 'VALIDANDO...' : 'ENTRAR' }}</button>
-      @if (passkeyApi.disponivel && passkeyApi.instalado) { <button type="button" [disabled]="autenticando()" (click)="entrarComFaceId()">ENTRAR COM FACE ID</button> }
+      @if (passkeyApi.disponivel && passkeyApi.instalado && passkeyApi.temChaveNesteDispositivo()) { <button type="button" [disabled]="autenticando()" (click)="entrarComFaceId()">ENTRAR COM FACE ID</button> }
     </form>
     <small>A sessão de voz é habilitada somente após a autenticação.</small>
   </section>
 }
 
+@if (cadastroFaceId()) {
+  <button type="button" class="faceid-backdrop" aria-label="Fechar configuração do Face ID" (click)="cadastroFaceId.set(false)"></button>
+  <section class="faceid-setup" role="dialog" aria-modal="true" aria-labelledby="tituloFaceId">
+    <span>ACESSO RÁPIDO // IPHONE</span>
+    <h2 id="tituloFaceId">Criar chave de acesso?</h2>
+    <p>Você já entrou com senha. Salve uma chave do Zyven neste iPhone para usar o Face ID quando precisar entrar novamente.</p>
+    <p>A chave fica no app Senhas do iPhone. Se o aparelho oferecer QR code, escolha salvar neste iPhone.</p>
+    @if (cadastroFaceIdErro()) { <p class="login-error" role="alert">{{ cadastroFaceIdErro() }}</p> }
+    <div class="faceid-actions"><button type="button" [disabled]="cadastrandoFaceId()" (click)="registrarFaceId()">{{ cadastrandoFaceId() ? 'CRIANDO...' : 'CRIAR CHAVE NESTE IPHONE' }}</button><button type="button" (click)="cadastroFaceId.set(false)">AGORA NÃO</button></div>
+  </section>
+}
+
 <main>
   @if (arrastandoArquivo()) { <div class="drop-overlay" aria-hidden="true"><strong>SOLTE O ARQUIVO</strong><small>OFX ou foto de treino · preparado neste navegador</small></div> }
-  <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven">
+  <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven" (pointermove)="moverFoco($event)" (pointerleave)="limparFoco($event)">
     <app-voice-waveform />
     @if (autenticado()) {
       <nav class="atom-nav" aria-label="Módulos do Zyven">
-        <span class="orbit-ring orbit-ring-one" aria-hidden="true"></span><span class="orbit-ring orbit-ring-two" aria-hidden="true"></span>
+        <span class="field-ring field-ring-a" aria-hidden="true"></span>
+        <span class="field-ring field-ring-b" aria-hidden="true"></span>
         @for (modulo of modulos; track modulo.id) {
           @if (modulo.id !== 'inicio') {
-            <button type="button" class="orbit-option" [class.active]="moduloAtivo() === modulo.id" [attr.data-module]="modulo.id" (click)="selecionarModulo(modulo.id)"><span class="electron" aria-hidden="true"></span><span>{{ modulo.nome }}</span></button>
+            <button type="button" class="orbit-option" [class.active]="moduloAtivo() === modulo.id" [attr.data-module]="modulo.id" [attr.aria-label]="'Abrir ' + modulo.nome" (click)="selecionarModulo(modulo.id)">
+              <span class="orbit-icon" aria-hidden="true">
+                @switch (modulo.id) {
+                  @case ('financeiro') { <svg viewBox="0 0 32 32"><rect x="5" y="10" width="22" height="17" rx="2"/><path d="M5 15h22M10 10V6h12v4M21 21h3"/></svg> }
+                  @case ('academia') { <svg viewBox="0 0 32 32"><path d="M3 13v6m4-9v12m4-9v6m10-6v6m4-9v12m4-9v6M11 16h10"/></svg> }
+                  @case ('agenda') { <svg viewBox="0 0 32 32"><rect x="5" y="8" width="22" height="20" rx="2"/><path d="M10 4v8m12-8v8M5 14h22M11 20h3m5 0h3m-11 4h3"/></svg> }
+                  @case ('tarefas') { <svg viewBox="0 0 32 32"><rect x="6" y="5" width="20" height="23" rx="2"/><path d="m10 13 2 2 4-4m3 3h4m-13 7 2 2 4-4m3 3h4"/></svg> }
+                  @case ('integracoes') { <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="4"/><circle cx="5" cy="7" r="2"/><circle cx="27" cy="7" r="2"/><circle cx="16" cy="28" r="2"/><path d="M7 8.5 13 13M25 8.5 19 13m-3 7v6"/></svg> }
+                }
+              </span>
+              <span class="orbit-name">{{ modulo.nome }}</span>
+            </button>
           }
         }
       </nav>

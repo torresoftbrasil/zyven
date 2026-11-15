@@ -78,6 +78,9 @@ export class App implements OnDestroy {
   readonly autenticado = signal(false);
   readonly autenticando = signal(false);
   readonly loginErro = signal('');
+  readonly cadastroFaceId = signal(false);
+  readonly cadastroFaceIdErro = signal('');
+  readonly cadastrandoFaceId = signal(false);
   readonly usuario = signal('');
   readonly tituloModulo = computed(() => this.modulos.find((modulo) => modulo.id === this.moduloAtivo())?.nome ?? 'Início');
   readonly codigoModulo = computed(() => this.modulos.find((modulo) => modulo.id === this.moduloAtivo())?.codigo ?? '01');
@@ -95,6 +98,7 @@ export class App implements OnDestroy {
   private readonly clockInterval: number;
   private readonly notificacaoInterval: number;
   private importacaoInterval?: number;
+  private focoFrame = 0;
 
   constructor(
     private readonly geminiLive: GeminiLive,
@@ -121,6 +125,7 @@ export class App implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    cancelAnimationFrame(this.focoFrame);
     clearInterval(this.clockInterval);
     clearInterval(this.notificacaoInterval);
     if (this.importacaoInterval) clearInterval(this.importacaoInterval);
@@ -137,6 +142,32 @@ export class App implements OnDestroy {
     this.painelVisivel.set(true);
     if (modulo === 'financeiro') void this.carregarFinanceiro();
     if (modulo === 'academia') void this.carregarTreinos();
+  }
+
+  moverFoco(evento: PointerEvent): void {
+    if (evento.pointerType === 'touch' || this.painelVisivel()) return;
+    const alvo = evento.currentTarget as HTMLElement;
+    const x = evento.clientX;
+    const y = evento.clientY;
+    cancelAnimationFrame(this.focoFrame);
+    this.focoFrame = requestAnimationFrame(() => {
+      const area = alvo.getBoundingClientRect();
+      alvo.style.setProperty('--foco-x', `${x - area.left}px`);
+      alvo.style.setProperty('--foco-y', `${y - area.top}px`);
+      alvo.style.setProperty('--foco-opacidade', '1');
+      for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) {
+        const limite = botao.getBoundingClientRect();
+        const distancia = Math.hypot(x - (limite.left + limite.width / 2), y - (limite.top + limite.height / 2));
+        botao.style.setProperty('--proximidade', Math.max(0, 1 - distancia / 260).toFixed(3));
+      }
+    });
+  }
+
+  limparFoco(evento: PointerEvent): void {
+    cancelAnimationFrame(this.focoFrame);
+    const alvo = evento.currentTarget as HTMLElement;
+    alvo.style.setProperty('--foco-opacidade', '0');
+    for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--proximidade', '0');
   }
   fecharPainel(): void {
     if (!this.painelVisivel() || this.painelFechando()) return;
@@ -160,7 +191,12 @@ export class App implements OnDestroy {
     this.autenticando.set(true);
     this.loginErro.set('');
     void this.autenticacaoApi.entrar(String(dados.get('login') ?? '').trim(), String(dados.get('senha') ?? ''))
-      .then((sessao) => this.iniciarSessao(sessao.login))
+      .then((sessao) => {
+        this.iniciarSessao(sessao.login);
+        if (this.passkeyApi.instalado && this.passkeyApi.disponivel && !this.passkeyApi.temChaveNesteDispositivo()) {
+          this.cadastroFaceId.set(true);
+        }
+      })
       .catch((erro: unknown) => {
         const status = erro instanceof HttpErrorResponse ? erro.status : -1;
         this.loginErro.set(status === 401
@@ -179,21 +215,31 @@ export class App implements OnDestroy {
       this.arquivoPreparado.set(null);
       this.previaOfx.set(null);
       this.notificacoes.set([]);
+      this.cadastroFaceId.set(false);
       void this.geminiLive.disconnect();
     });
   }
 
   registrarFaceId(): void {
-    this.loginErro.set('');
-    void this.passkeyApi.registrar().then(() => this.respostaComando.set('Face ID ativado neste dispositivo. Você poderá usá-lo no próximo acesso.'))
-      .catch((erro: unknown) => this.respostaComando.set(erro instanceof Error ? erro.message : 'Não foi possível ativar o Face ID.'));
+    if (this.cadastrandoFaceId()) return;
+    this.cadastrandoFaceId.set(true);
+    this.cadastroFaceIdErro.set('');
+    void this.passkeyApi.registrar().then(() => {
+      this.cadastroFaceId.set(false);
+      this.respostaComando.set('Chave de acesso criada neste iPhone. O Face ID ficará disponível quando precisar entrar novamente.');
+    }).catch((erro: unknown) => this.cadastroFaceIdErro.set(erro instanceof Error ? erro.message : 'Não foi possível criar a chave de acesso.'))
+      .finally(() => this.cadastrandoFaceId.set(false));
   }
 
-  entrarComFaceId(): void {
+  entrarComFaceId(automatico = false): void {
+    if (this.autenticando()) return;
     this.autenticando.set(true);
     this.loginErro.set('');
-    void this.passkeyApi.entrar().then(() => this.autenticacaoApi.sessao()).then(sessao => this.iniciarSessao(sessao.login))
-      .catch((erro: unknown) => this.loginErro.set(erro instanceof Error ? erro.message : 'Não foi possível entrar com Face ID.'))
+    void this.passkeyApi.entrar(this.passkeyApi.temChaveNesteDispositivo())
+      .then(() => this.autenticacaoApi.sessao()).then(sessao => this.iniciarSessao(sessao.login))
+      .catch((erro: unknown) => this.loginErro.set(automatico
+        ? 'Toque em ENTRAR COM FACE ID para confirmar neste iPhone, ou use sua senha.'
+        : erro instanceof Error ? erro.message : 'Não foi possível entrar com Face ID.'))
       .finally(() => this.autenticando.set(false));
   }
 
@@ -511,7 +557,7 @@ export class App implements OnDestroy {
   }
 
   @HostListener('document:keydown.escape')
-  fecharComEscape(): void { if (this.notificacoesAbertas()) this.notificacoesAbertas.set(false); else if (this.importacoesAbertas()) this.fecharImportacoes(); else if (this.modalAberto()) this.fecharModal(); else this.fecharPainel(); }
+  fecharComEscape(): void { if (this.cadastroFaceId()) this.cadastroFaceId.set(false); else if (this.notificacoesAbertas()) this.notificacoesAbertas.set(false); else if (this.importacoesAbertas()) this.fecharImportacoes(); else if (this.modalAberto()) this.fecharModal(); else this.fecharPainel(); }
 
   abrirNotificacoes(): void { this.notificacoesAbertas.set(true); void this.avaliarNotificacoes(); }
   fecharNotificacoesExterno(evento: MouseEvent): void { if (evento.target === evento.currentTarget) this.notificacoesAbertas.set(false); }
@@ -565,7 +611,9 @@ export class App implements OnDestroy {
   private formatarHorario(): string { return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date()); }
   private async recuperarSessao(): Promise<void> {
     try { this.iniciarSessao((await this.autenticacaoApi.sessao()).login); }
-    catch { /* Sem sessão anterior: manter a tela de login. */ }
+    catch {
+      if (this.passkeyApi.instalado && this.passkeyApi.temChaveNesteDispositivo()) this.entrarComFaceId(true);
+    }
   }
   private iniciarSessao(login: string): void {
     this.usuario.set(login);

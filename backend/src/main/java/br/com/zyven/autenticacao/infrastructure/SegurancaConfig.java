@@ -48,7 +48,9 @@ public class SegurancaConfig {
             @Value("${zyven.webauthn.origin:http://localhost:4200}") String origin) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
-                .webAuthn(passkey -> passkey.rpId(rpId).rpName("Zyven").allowedOrigins(origin).disableDefaultRegistrationPage(true))
+                .webAuthn(passkey -> passkey.rpId(rpId).rpName("Zyven").allowedOrigins(origin)
+                        .creationOptionsRepository(new OpcoesCadastroChaveRepository())
+                        .disableDefaultRegistrationPage(true))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(autorizacao -> autorizacao
                         .requestMatchers(HttpMethod.POST, "/api/autenticacao/login").permitAll()

@@ -152,6 +152,12 @@ authenticator; Zyven stores public credentials, never face images. Keep password
 login available as recovery. Configure the WebAuthn relying-party ID and origin
 per deployment. The Spring Security JDBC repositories use fixed English SQL
 identifiers, exposed as simple views over Portuguese-named tables.
+Authenticated sessions last up to 30 days without activity and are stored in
+PostgreSQL by Spring Session JDBC. Its fixed `spring_session` infrastructure
+tables are an exception to the domain naming rule and must be evolved only by
+Flyway. WebAuthn registration challenges stay in short-lived server memory;
+users can restart registration after a server restart. A device-local passkey
+hint may improve the sign-in UI but must never be treated as authorization.
 
 ## Installed App and Notifications
 
