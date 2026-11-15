@@ -158,7 +158,8 @@ export class App implements OnDestroy {
       for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) {
         const limite = botao.getBoundingClientRect();
         const distancia = Math.hypot(x - (limite.left + limite.width / 2), y - (limite.top + limite.height / 2));
-        botao.style.setProperty('--proximidade', Math.max(0, 1 - distancia / 260).toFixed(3));
+        const proximidade = Math.max(0, 1 - distancia / 260);
+        botao.style.setProperty('--brilho', (1 + proximidade * .8).toFixed(3));
       }
     });
   }
@@ -167,7 +168,7 @@ export class App implements OnDestroy {
     cancelAnimationFrame(this.focoFrame);
     const alvo = evento.currentTarget as HTMLElement;
     alvo.style.setProperty('--foco-opacidade', '0');
-    for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--proximidade', '0');
+    for (const botao of alvo.querySelectorAll<HTMLElement>('.orbit-option')) botao.style.setProperty('--brilho', '1');
   }
   fecharPainel(): void {
     if (!this.painelVisivel() || this.painelFechando()) return;
