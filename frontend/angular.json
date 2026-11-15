@@ -18,6 +18,7 @@
           "builder": "@angular/build:application",
           "options": {
             "browser": "src/main.ts",
+            "serviceWorker": "ngsw-config.json",
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {

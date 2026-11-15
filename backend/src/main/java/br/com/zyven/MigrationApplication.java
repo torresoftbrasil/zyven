@@ -14,6 +14,7 @@ public class MigrationApplication {
         System.setProperty("spring.flyway.enabled", "false");
         System.setProperty("spring.jpa.hibernate.ddl-auto", "none");
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(ZyvenApplication.class)
+                .profiles("migration")
                 .web(WebApplicationType.NONE)
                 .bannerMode(Banner.Mode.OFF)
                 .run(args)) {

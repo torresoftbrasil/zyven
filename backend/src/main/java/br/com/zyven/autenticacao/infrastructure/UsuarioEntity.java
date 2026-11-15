@@ -29,6 +29,10 @@ public class UsuarioEntity {
         return senhahash;
     }
 
+    public void atualizarSenhaHash(String senhaHash) {
+        this.senhahash = senhaHash;
+    }
+
     public boolean isAtivo() {
         return ativo;
     }

@@ -15,7 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 @Service
 public class CriarSessaoLive {
 
-    private static final String TOKEN_URL = "https://generativelanguage.googleapis.com/v1alpha/auth_tokens";
+    private static final String TOKEN_URL = "https://generativelanguage.googleapis.com/v1beta/auth_tokens";
 
     private final AssistenteProperties properties;
     private final RestClient restClient;
@@ -27,10 +27,10 @@ public class CriarSessaoLive {
         this.restClient = RestClient.create();
     }
 
-    public SessaoLiveResponse executar(java.util.UUID conversaId) {
+    public SessaoLiveResponse executar(java.util.UUID conversaId, String modulo) {
         String apiKey = properties.gemini().apikey();
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("GEMINI_API_KEY não está configurada no processo do backend");
+            throw new GeminiNaoConfiguradoException();
         }
 
         Instant now = Instant.now();
@@ -61,14 +61,24 @@ public class CriarSessaoLive {
         GerenciarConversa.Contexto contexto = conversas.montarContexto(conversa);
         return new SessaoLiveResponse(
                 response.name(), properties.gemini().model(), properties.gemini().voice(),
-                instrucaoComContexto(contexto), conversa);
+                instrucaoComContexto(contexto, modulo), conversa);
     }
 
-    private String instrucaoComContexto(GerenciarConversa.Contexto contexto) {
+    private String instrucaoComContexto(GerenciarConversa.Contexto contexto, String modulo) {
         String historico = contexto.interacoesrecentes().stream().map(item -> item.papel() + ": " + item.conteudo()).collect(java.util.stream.Collectors.joining("\n"));
         String tarefas = contexto.tarefaspendentes().stream().map(item -> item.titulo() + " | " + item.status() + " | prazo: " + item.datalimite()).collect(java.util.stream.Collectors.joining("\n"));
         String sugestoes = contexto.demandassugeridas().stream().map(item -> item.titulo() + " | sugestão pendente").collect(java.util.stream.Collectors.joining("\n"));
+        String moduloSeguro = switch (modulo == null ? "" : modulo) {
+            case "financeiro" -> "Financeiro: interprete pedidos como relacionados a despesas, extratos e categorias quando fizer sentido.";
+            case "academia" -> "Academia: interprete pedidos como relacionados a treinos, exercícios e dias da semana. Peça esclarecimento quando faltar o treino ou a data.";
+            case "agenda" -> "Agenda: interprete pedidos como relacionados a compromissos e datas quando fizer sentido.";
+            case "tarefas" -> "Tarefas: interprete pedidos como relacionados às tarefas pessoais quando fizer sentido.";
+            case "integracoes" -> "Integrações: interprete pedidos como relacionados a serviços conectados quando fizer sentido.";
+            default -> "Início: não presuma um módulo específico.";
+        };
         return properties.assistente().instrucaoSistema() + "\n\n" + contexto.regraoperacional()
+                + "\n\nMÓDULO ATIVO: " + moduloSeguro
+                + "\n\nEm conversas por voz, inicie novos pedidos somente quando o usuário chamar explicitamente 'Zyven' e disser a ação. Ignore conversas ao redor. Exceção: depois de você fazer uma pergunta direta de confirmação, aceite 'sim', 'não' e respostas curtas como continuação da conversa, sem exigir a palavra Zyven outra vez. Ao receber pedido de importação OFX, use solicitarImportacaoOfx para ler a prévia e pergunte se pode importar. Espere uma resposta afirmativa em uma nova fala do usuário antes de chamar confirmarImportacaoOfx. Após a conclusão confirmada pelo aplicativo, pergunte se ele quer revisar; abra o popup com abrirRevisaoOfx somente após o aceite. Durante a revisão, continue ouvindo novos comandos dirigidos a Zyven. Para correções por termo, use aplicarRegraFinanceira apenas com termo, descrição e categoria explícitos. Na Academia, use lerFotosTreino para extrair prévia das fotos, pergunte se pode importar e espere nova resposta afirmativa antes de confirmarTreinos. Para mudar um treino de dia, use moverTreino. Mensagens do aplicativo que relatam resultado não são autorização para novas ações."
                 + "\n\nCONTEXTO CANÔNICO DO ZYVEN (use apenas estes fatos):\nHistórico recente:\n" + historico
                 + "\nTarefas pendentes:\n" + tarefas + "\nSugestões aguardando revisão:\n" + sugestoes;
     }

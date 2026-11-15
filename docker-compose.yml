@@ -28,6 +28,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?}
       GEMINI_API_KEY: ${GEMINI_API_KEY:?}
       ZYVEN_SESSION_COOKIE_SECURE: "true"
+      ZYVEN_WEBAUTHN_RPID: ${ZYVEN_WEBAUTHN_RPID:-zyven.torresoftbrasil.com.br}
+      ZYVEN_WEBAUTHN_ORIGIN: ${ZYVEN_WEBAUTHN_ORIGIN:-https://zyven.torresoftbrasil.com.br}
+      ZYVEN_USUARIO_SENHAHASH: ${ZYVEN_USUARIO_SENHAHASH:-}
     depends_on:
       db:
         condition: service_healthy

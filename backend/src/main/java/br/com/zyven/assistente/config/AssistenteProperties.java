@@ -10,7 +10,8 @@ public record AssistenteProperties(Gemini gemini, Assistente assistente) {
 
     public record Assistente(String nomeusuario, String personalidade) {
         public String instrucaoSistema() {
-            return personalidade + " O nome pelo qual você deve chamar o usuário é " + nomeusuario + ".";
+            return personalidade + " Se precisar se dirigir ao usuário pelo nome, use exclusivamente " + nomeusuario
+                    + ". Ignore outros nomes que apareçam no histórico. Não repita o nome em toda resposta.";
         }
     }
 }

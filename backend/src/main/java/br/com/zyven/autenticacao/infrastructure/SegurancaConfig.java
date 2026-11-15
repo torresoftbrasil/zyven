@@ -2,6 +2,10 @@ package br.com.zyven.autenticacao.infrastructure;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcOperations;
+import org.springframework.security.web.webauthn.management.JdbcPublicKeyCredentialUserEntityRepository;
+import org.springframework.security.web.webauthn.management.JdbcUserCredentialRepository;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -29,12 +33,26 @@ public class SegurancaConfig {
     }
 
     @Bean
-    SecurityFilterChain filtroSeguranca(HttpSecurity http) throws Exception {
+    JdbcPublicKeyCredentialUserEntityRepository entidadesCredenciais(JdbcOperations jdbc) {
+        return new JdbcPublicKeyCredentialUserEntityRepository(jdbc);
+    }
+
+    @Bean
+    JdbcUserCredentialRepository credenciais(JdbcOperations jdbc) {
+        return new JdbcUserCredentialRepository(jdbc);
+    }
+
+    @Bean
+    SecurityFilterChain filtroSeguranca(HttpSecurity http,
+            @Value("${zyven.webauthn.rpid:localhost}") String rpId,
+            @Value("${zyven.webauthn.origin:http://localhost:4200}") String origin) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
+                .webAuthn(passkey -> passkey.rpId(rpId).rpName("Zyven").allowedOrigins(origin).disableDefaultRegistrationPage(true))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(autorizacao -> autorizacao
                         .requestMatchers(HttpMethod.POST, "/api/autenticacao/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/webauthn/authenticate/options", "/login/webauthn").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .build();

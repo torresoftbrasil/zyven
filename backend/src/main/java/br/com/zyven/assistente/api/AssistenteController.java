@@ -18,8 +18,8 @@ public class AssistenteController {
 
     @PostMapping("/sessao")
     SessaoLiveResponse criarSessao(@RequestBody(required = false) SessaoLiveRequest request) {
-        return criarSessaoLive.executar(request == null ? null : request.conversaid());
+        return criarSessaoLive.executar(request == null ? null : request.conversaid(), request == null ? null : request.modulo());
     }
 
-    record SessaoLiveRequest(java.util.UUID conversaid) { }
+    record SessaoLiveRequest(java.util.UUID conversaid, String modulo) { }
 }

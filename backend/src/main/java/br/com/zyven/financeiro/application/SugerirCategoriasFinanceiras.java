@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import br.com.zyven.assistente.config.AssistenteProperties;
 import br.com.zyven.financeiro.domain.CategoriaFinanceira;
@@ -32,17 +34,30 @@ public class SugerirCategoriasFinanceiras {
     public List<FinanceiroStore.SugestaoCategoria> executar(List<FinanceiroStore.PendenteParaAnalise> pendentes) {
         if (pendentes.isEmpty() || properties.gemini().apikey() == null || properties.gemini().apikey().isBlank()) return List.of();
         try {
-            List<Map<String, String>> dadosMinimos = pendentes.stream().map(item -> Map.of("id", item.lancamentoid().toString(), "descricao", item.descricao())).toList();
-            Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", INSTRUCAO + "\nTransações: " + objectMapper.writeValueAsString(dadosMinimos))))), "generationConfig", Map.of("responseMimeType", "application/json", "temperature", 0.0));
+            List<Map<String, String>> dadosMinimos = pendentes.stream().map(item -> Map.of("id", item.lancamentoid().toString(), "descricao", higienizarParaIa(item.descricao()))).toList();
+            Map<String, Object> body = Map.of("systemInstruction", Map.of("parts", List.of(Map.of("text", INSTRUCAO))), "contents", List.of(Map.of("parts", List.of(Map.of("text", objectMapper.writeValueAsString(dadosMinimos))))), "generationConfig", Map.of("responseMimeType", "application/json", "temperature", 0.0));
             String resposta = restClient.post().uri("https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent", properties.gemini().modelotexto())
                     .header("x-goog-api-key", properties.gemini().apikey()).contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(String.class);
             JsonNode sugestoes = objectMapper.readTree(objectMapper.readTree(resposta).path("candidates").path(0).path("content").path("parts").path(0).path("text").asText()).path("sugestoes");
             List<FinanceiroStore.SugestaoCategoria> resultado = new ArrayList<>();
-            for (JsonNode item : sugestoes) resultado.add(new FinanceiroStore.SugestaoCategoria(UUID.fromString(item.path("id").asText()), CategoriaFinanceira.valueOf(item.path("categoria").asText("OUTROS")), item.path("confianca").decimalValue()));
+            Set<UUID> permitidos = pendentes.stream().map(FinanceiroStore.PendenteParaAnalise::lancamentoid).collect(Collectors.toSet());
+            for (JsonNode item : sugestoes) {
+                UUID id = UUID.fromString(item.path("id").asText());
+                BigDecimal confianca = item.path("confianca").decimalValue();
+                if (!permitidos.remove(id) || confianca.compareTo(BigDecimal.ZERO) < 0 || confianca.compareTo(BigDecimal.ONE) > 0) continue;
+                resultado.add(new FinanceiroStore.SugestaoCategoria(id, CategoriaFinanceira.valueOf(item.path("categoria").asText("OUTROS")), confianca));
+            }
             return resultado;
         } catch (Exception exception) {
             LOGGER.warn("Não foi possível gerar sugestões de categoria financeira");
             return List.of();
         }
+    }
+
+    private String higienizarParaIa(String descricao) {
+        return descricao.replaceAll("[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}", "[email]")
+                .replaceAll("(?<!\\d)\\d{3}\\.?\\d{3}\\.?\\d{3}[- ]?\\d{2}(?!\\d)", "[documento]")
+                .replaceAll("(?<!\\d)\\d{2}\\.?\\d{3}\\.?\\d{3}[/ ]?\\d{4}[- ]?\\d{2}(?!\\d)", "[documento]")
+                .replaceAll("(?<!\\d)\\d{5,}(?!\\d)", "[numero]");
     }
 }

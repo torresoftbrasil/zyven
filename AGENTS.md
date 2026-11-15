@@ -146,7 +146,24 @@ host: localhost
 port: 5432
 ```
 
-Authentication is intentionally out of scope until explicitly introduced.
+Authentication is now implemented with username/password and optional WebAuthn
+passkeys on installed devices. Device biometrics remain inside the platform
+authenticator; Zyven stores public credentials, never face images. Keep password
+login available as recovery. Configure the WebAuthn relying-party ID and origin
+per deployment. The Spring Security JDBC repositories use fixed English SQL
+identifiers, exposed as simple views over Portuguese-named tables.
+
+## Installed App and Notifications
+
+- The Angular PWA caches only the application shell and static assets. Do not
+  cache authenticated API responses or OFX and training images in the service worker.
+- The module selected in the orbital navigation is context for a new Gemini Live
+  session; preserve the conversation ID when switching modules.
+- Training photos stay in browser memory until the user requests AI reading;
+  extracted workouts need confirmation before persistence.
+- Notification suggestions are persisted and deduplicated. Device notifications
+  require explicit permission; interactive actions have equivalent controls in
+  the app. Remote push delivery requires its own backend subscription and sender.
 
 ## Delivery Workflow
 

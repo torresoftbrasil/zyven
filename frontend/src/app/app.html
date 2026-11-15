@@ -3,7 +3,7 @@
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
     <span>Z Y V E N</span>
   </a>
-  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time>@if (autenticado()) { <button type="button" class="logout" (click)="sair()">SAIR</button> }</div>
+  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time>@if (autenticado()) { <button type="button" class="logout notification-trigger" (click)="abrirNotificacoes()" [attr.aria-label]="'Notificações, ' + notificacoesPendentes().length + ' pendentes'">AVISOS @if (notificacoesPendentes().length) { <b>{{ notificacoesPendentes().length }}</b> }</button>@if (passkeyApi.disponivel && passkeyApi.instalado) { <button type="button" class="logout" (click)="registrarFaceId()">ATIVAR FACE ID</button> }<button type="button" class="logout" (click)="sair()">SAIR</button> }</div>
 </header>
 
 @if (!autenticado()) {
@@ -16,14 +16,40 @@
       <label>SENHA<input name="senha" type="password" autocomplete="current-password" required maxlength="200"></label>
       @if (loginErro()) { <p class="login-error" role="alert">{{ loginErro() }}</p> }
       <button type="submit" [disabled]="autenticando()">{{ autenticando() ? 'VALIDANDO...' : 'ENTRAR' }}</button>
+      @if (passkeyApi.disponivel && passkeyApi.instalado) { <button type="button" [disabled]="autenticando()" (click)="entrarComFaceId()">ENTRAR COM FACE ID</button> }
     </form>
     <small>A sessão de voz é habilitada somente após a autenticação.</small>
   </section>
 }
 
 <main>
+  @if (arrastandoArquivo()) { <div class="drop-overlay" aria-hidden="true"><strong>SOLTE O ARQUIVO</strong><small>OFX ou foto de treino · preparado neste navegador</small></div> }
   <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven">
     <app-voice-waveform />
+    @if (autenticado()) {
+      <nav class="atom-nav" aria-label="Módulos do Zyven">
+        <span class="orbit-ring orbit-ring-one" aria-hidden="true"></span><span class="orbit-ring orbit-ring-two" aria-hidden="true"></span>
+        @for (modulo of modulos; track modulo.id) {
+          @if (modulo.id !== 'inicio') {
+            <button type="button" class="orbit-option" [class.active]="moduloAtivo() === modulo.id" [attr.data-module]="modulo.id" (click)="selecionarModulo(modulo.id)"><span class="electron" aria-hidden="true"></span><span>{{ modulo.nome }}</span></button>
+          }
+        }
+      </nav>
+      <div class="assistant-controls">
+        @if (arquivoPreparado(); as arquivo) { <div class="staged-file" role="status"><span>OFX PREPARADO <strong>{{ arquivo.name }}</strong></span><button type="button" (click)="arquivoPreparado.set(null)" aria-label="Remover arquivo preparado">×</button></div> }
+        @if (fotosPreparadas().length) { <div class="staged-file" role="status"><span>FOTOS PREPARADAS <strong>{{ fotosPreparadas().length }} para leitura de treinos</strong></span><button type="button" (click)="fotosPreparadas.set([]); previaTreinos.set([])" aria-label="Remover fotos preparadas">×</button></div> }
+        <div class="input-switch" role="group" aria-label="Modo de interação">
+          <button type="button" [class.active]="modoEntrada() === 'VOZ'" [attr.aria-pressed]="modoEntrada() === 'VOZ'" (click)="iniciarVoz()">{{ audioState.connected() && audioState.listening() ? 'VOZ ATIVA' : 'INICIAR VOZ' }}</button>
+          <button type="button" [class.active]="modoEntrada() === 'TEXTO'" [attr.aria-pressed]="modoEntrada() === 'TEXTO'" (click)="usarTexto()">DIGITAR</button>
+        </div>
+        <div class="attachment-control"><button type="button" class="attachment-trigger" aria-label="Adicionar arquivo ou foto" [attr.aria-expanded]="menuAnexosAberto()" (click)="menuAnexosAberto.set(!menuAnexosAberto())">+</button>@if (menuAnexosAberto()) { <div class="attachment-menu"><label>ESCOLHER ARQUIVO<input type="file" accept=".ofx,image/*" multiple (change)="escolherAnexo($event)"></label><label>TIRAR FOTO<input type="file" accept="image/*" capture="environment" (change)="escolherAnexo($event)"></label></div> }</div>
+        @if (modoEntrada() === 'TEXTO') { <form (submit)="enviarComando($event)">
+          <label for="comandoZyven">Mensagem para Zyven</label>
+          <div><input id="comandoZyven" [formControl]="comando" placeholder="Escreva um pedido ou 'importar OFX'" maxlength="500" autocomplete="off"><button type="submit">ENVIAR</button></div>
+        </form> }
+        @if (respostaTexto()) { <p class="assistant-response" role="status" aria-live="polite">{{ respostaTexto() }}</p> }
+      </div>
+    }
   </section>
 
   @if (painelVisivel()) {
@@ -33,7 +59,7 @@
       <div class="panel-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <header class="panel-header">
         <div><span>MOD // {{ codigoModulo() }}</span><h1 id="tituloModulo">{{ tituloModulo() }}</h1></div>
-        <div class="actions"><button type="button" (click)="abrirModal()">+ Incluir</button><button type="button" aria-label="Fechar" (click)="fecharPainel()">×</button></div>
+        <div class="actions">@if (moduloAtivo() === 'financeiro') { <button type="button" (click)="abrirImportacoes()">IMPORTAÇÕES</button> }@if (moduloAtivo() !== 'academia') { <button type="button" (click)="abrirModal()">+ Incluir</button> }<button type="button" aria-label="Fechar" (click)="fecharPainel()">×</button></div>
       </header>
       <nav class="tabs panel-tabs" aria-label="Seções do módulo">
         @for (aba of abas(); track aba) {
@@ -45,14 +71,33 @@
           <section class="ofx-import" aria-labelledby="tituloImportacaoOfx">
             <header><div><span>IMPORTAÇÃO LOCAL // OFX</span><h2 id="tituloImportacaoOfx">Extrato financeiro</h2></div><small>REVISÃO INTELIGENTE</small></header>
             <p>O arquivo é higienizado no Zyven. Regras confirmadas são aplicadas primeiro; somente descrições sem correspondência seguem para sugestão de categoria.</p>
-            <label class="file-drop" [class.loading]="financeiroImportando()"><input type="file" accept=".ofx,application/x-ofx" (change)="importarOfx($event)" [disabled]="financeiroImportando()"><strong>{{ financeiroImportando() ? 'PROCESSANDO OFX...' : 'SELECIONAR ARQUIVO OFX' }}</strong><small>Máximo 5 MB · senhas e dados da conta não são enviados à IA</small></label>
+            <label class="file-drop" [class.loading]="financeiroImportando()"><input type="file" accept=".ofx,application/x-ofx" (change)="importarOfx($event)" [disabled]="financeiroImportando()"><strong>{{ financeiroImportando() ? 'PROCESSANDO OFX...' : 'SELECIONAR OU SOLTAR ARQUIVO OFX' }}</strong><small>Máximo 5 MB · arquivo preparado apenas nesta sessão do navegador</small></label>
+            @if (arquivoPreparado()) { <button class="review-link" type="button" [disabled]="financeiroImportando() || previaCarregando()" (click)="prepararImportacao()">{{ previaCarregando() ? 'LENDO OFX...' : 'LER PRÉVIA DO OFX' }}</button> }
+            @if (previaOfx(); as previa) { <div class="ofx-preview" role="status"><strong>{{ previa.transacoes }} TRANSAÇÕES</strong><span>{{ previa.inicio }} → {{ previa.fim }}</span><p>Posso importar e analisar as categorias?</p><div><button type="button" (click)="confirmarImportacao()">SIM, IMPORTAR</button><button type="button" (click)="cancelarPrevia()">AGORA NÃO</button></div></div> }
+            @if (financeiroImportando()) { <p class="import-feedback" role="status" aria-live="polite">Importando o extrato… {{ tempoImportacao() }} s decorridos. O tempo total depende do tamanho do arquivo e das sugestões de categoria.</p> }
             @if (financeiroMensagem()) { <p class="import-feedback success">{{ financeiroMensagem() }}</p> }
+            @if (financeiroMensagem()) { <button class="review-link" type="button" (click)="abrirImportacoes()">REVISAR IMPORTAÇÃO</button> }
             @if (financeiroErro()) { <p class="import-feedback error">{{ financeiroErro() }}</p> }
           </section>
         } @else if (moduloAtivo() === 'financeiro' && abaAtiva() === 'Registros') {
           <section class="review-list" aria-labelledby="tituloRevisao">
             <header><div><span>REVISÃO NECESSÁRIA</span><h2 id="tituloRevisao">Categorias pendentes</h2></div><small>{{ totalPendentes() }} PENDENTE(S)</small></header>
             @if (financeiroCarregando()) { <p>Carregando lançamentos…</p> } @else if (lancamentosPendentes().length === 0) { <p>Nenhum lançamento aguardando revisão.</p> } @else { <ul>@for (lancamento of lancamentosPendentes(); track lancamento.id) { <li><div><strong>{{ lancamento.descricao }}</strong><span>{{ lancamento.data }} · {{ formatarValor(lancamento.valor) }}</span></div><span class="suggestion">{{ rotuloCategoria(lancamento.categoria) }}{{ formatarConfianca(lancamento.confianca) }}</span><select aria-label="Confirmar categoria" (change)="confirmarLancamento(lancamento, $event)"><option value="">Confirmar categoria…</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor" [selected]="categoria.valor === lancamento.categoria">{{ categoria.rotulo }}</option>}</select></li> }</ul> }
+          </section>
+        } @else if (moduloAtivo() === 'academia') {
+          <section class="gym-workspace" aria-label="Treinos da academia">
+            @if (abaAtiva() === 'Importar fotos') {
+              <header><span>EXTRAÇÃO VISUAL // ACADEMIA</span><h2>Treinos das fotos</h2></header>
+              <p>Adicione prints do professor pelo botão +. As fotos ficam neste navegador até você pedir a leitura. Confira a prévia antes de salvar.</p>
+              <label class="gym-photo-picker">ADICIONAR FOTOS<input type="file" accept="image/jpeg,image/png,image/webp" multiple (change)="escolherAnexo($event)"></label>
+              @if (fotosPreparadas().length) { <p>{{ fotosPreparadas().length }} foto(s) preparada(s)</p><button type="button" (click)="lerFotosTreino()" [disabled]="academiaCarregando()">{{ academiaCarregando() ? 'LENDO FOTOS...' : 'LER TREINOS COM IA' }}</button> }
+              @if (previaTreinos().length) { <div class="gym-preview"><h3>Prévia para confirmar</h3>@for (treino of previaTreinos(); track $index) { <article><strong>{{ treino.data }} · {{ treino.titulo }}</strong><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} · {{ exercicio.series }} · {{ exercicio.repeticoes }}</li> }</ul></article> }<button type="button" (click)="confirmarFotosTreino()">CONFIRMAR IMPORTAÇÃO</button></div> }
+            } @else {
+              <header><span>PLANO ATIVO // ACADEMIA</span><h2>Meus treinos</h2></header>
+              @if (treinos().length === 0) { <p>Nenhum treino ainda. Importe fotos do professor na aba ao lado.</p> }
+              @for (treino of treinos(); track treino.id) { <article class="gym-training"><div><strong>{{ treino.data }} · {{ treino.titulo }}</strong><label>MOVER PARA <input type="date" [value]="treino.data" (change)="moverTreino(treino, $any($event.target).value)"></label></div><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} <small>{{ exercicio.series }} · {{ exercicio.repeticoes }}{{ exercicio.observacao ? ' · ' + exercicio.observacao : '' }}</small></li> }</ul></article> }
+            }
+            @if (academiaMensagem()) { <p role="status">{{ academiaMensagem() }}</p> }
           </section>
         } @else {
         <div class="metrics">
@@ -73,17 +118,57 @@
 <aside class="coordinates"><span>LAT <b>--23.5505</b></span><span>LNG <b>--46.6333</b></span></aside>
 <aside class="secure"><i></i>CONEXÃO SEGURA</aside>
 
-<nav class="system-nav" aria-label="Módulos do sistema">
-  @for (modulo of modulos; track modulo.id) {
-    <button type="button" [class.active]="moduloAtivo() === modulo.id" (click)="selecionarModulo(modulo.id)"><span>{{ modulo.codigo }}</span>{{ modulo.nome }}</button>
-  }
-</nav>
 
 @if (modalAberto()) {
   <div class="modal-backdrop" role="presentation" (click)="fecharModalExterno($event)">
     <section class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
       <header><div><span>NOVO REGISTRO</span><h2 id="tituloModal">Incluir em {{ tituloModulo().toLowerCase() }}</h2></div><button type="button" aria-label="Fechar" (click)="fecharModal()">×</button></header>
       <form (submit)="salvar($event)"><label>Descrição<input type="text" required placeholder="Informe uma descrição"></label><label>Data<input type="date" required></label><footer><button type="button" (click)="fecharModal()">Cancelar</button><button type="submit">Salvar registro</button></footer></form>
+    </section>
+  </div>
+}
+
+@if (importacoesAbertas()) {
+  <div class="import-modal-backdrop" role="presentation" (click)="fecharImportacoesExterno($event)">
+    <section class="import-modal" role="dialog" aria-modal="true" aria-labelledby="tituloImportacoes">
+      <div class="import-scan" aria-hidden="true"></div>
+      <header><div><span>FINANCEIRO // REVISÃO</span><h2 id="tituloImportacoes">Importações</h2><small class="import-voice-status">{{ audioState.connected() && audioState.listening() ? '● VOZ ATIVA · DIGA ZYVEN PARA NOVOS COMANDOS' : 'VOZ DISPONÍVEL NA TELA PRINCIPAL' }}</small></div><button type="button" aria-label="Fechar importações" (click)="fecharImportacoes()">×</button></header>
+      <p>Confirme as sugestões da IA, ajuste descrições e categorias, ou crie uma regra por termo. A voz continua ativa durante a revisão.</p>
+      <div class="import-command"><button type="button" (click)="modoEntrada() === 'VOZ' ? usarTexto() : iniciarVoz()">{{ modoEntrada() === 'VOZ' ? 'DIGITAR COMANDO' : 'VOLTAR À VOZ' }}</button>@if (modoEntrada() === 'TEXTO') { <form (submit)="enviarComando($event)"><input [formControl]="comando" aria-label="Comando para Zyven durante a revisão" placeholder="Peça um ajuste, por exemplo: Zyven, coloque Uber em Transporte"><button type="submit">ENVIAR</button></form> }</div>
+      @if (respostaTexto()) { <p class="import-command-response" role="status">{{ respostaTexto() }}</p> }
+      <form class="bulk-rule-form" (submit)="aplicarRegraManual($event)"><label>CONTÉM<input name="termo" minlength="3" maxlength="120" required placeholder="Ex.: uber"></label><label>DESCRIÇÃO PADRÃO<input name="descricao" maxlength="255" required placeholder="Ex.: Uber"></label><label>CATEGORIA<select name="categoria" required><option value="">Selecione</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor">{{ categoria.rotulo }}</option> }</select></label><button type="submit">APLICAR A TODOS</button></form>
+      @if (financeiroErro()) { <p class="import-error" role="alert">{{ financeiroErro() }}</p> }
+      @if (importacoes().length === 0) { <p>Nenhuma importação concluída ainda.</p> }
+      @else {
+        <div class="import-history"><span>ARQUIVOS IMPORTADOS</span>@for (importacao of importacoes(); track importacao.id) { <small>{{ importacao.nomearquivo }} · {{ importacao.lancamentos.length }} lançamento(s)</small> }</div>
+        <section class="import-group"><header><h3>Sem sugestão da IA</h3><small>{{ revisaoSemSugestao().length }} PARA CATEGORIZAR</small></header>
+          @if (revisaoSemSugestao().length === 0) { <p>Todos os lançamentos receberam uma categoria ou já foram confirmados.</p> }
+          @else { <ul>@for (lancamento of revisaoSemSugestao(); track lancamento.id) { <li><div><strong>{{ lancamento.descricao }}</strong><small>{{ lancamento.nomearquivo }} · {{ lancamento.data }} · {{ formatarValor(lancamento.valor) }}</small><div class="rename-line"><input #descricaoSemSugestao [value]="lancamento.descricao" aria-label="Editar descrição de {{ lancamento.descricao }}" maxlength="255"><button type="button" (click)="salvarDescricao(lancamento, descricaoSemSugestao.value)">SALVAR NOME</button></div></div><select aria-label="Categoria para {{ lancamento.descricao }}" (change)="confirmarLancamento(lancamento, $event)"><option value="">Escolha uma categoria</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor">{{ categoria.rotulo }}</option> }</select></li> }</ul> }
+        </section>
+        <section class="import-group"><header><h3>Sugestões da IA</h3><small>{{ revisaoComSugestao().length }} PARA CONFERIR</small></header>
+          @if (revisaoComSugestao().length === 0) { <p>Nenhuma sugestão aguarda confirmação.</p> }
+          @else { <ul>@for (lancamento of revisaoComSugestao(); track lancamento.id) { <li><div><strong>{{ lancamento.descricao }}</strong><small>{{ lancamento.nomearquivo }} · {{ lancamento.data }} · {{ formatarValor(lancamento.valor) }}</small><em>Sugestão: {{ rotuloCategoria(lancamento.categoria) }}{{ formatarConfianca(lancamento.confianca) }}</em><div class="rename-line"><input #descricaoComSugestao [value]="lancamento.descricao" aria-label="Editar descrição de {{ lancamento.descricao }}" maxlength="255"><button type="button" (click)="salvarDescricao(lancamento, descricaoComSugestao.value)">SALVAR NOME</button></div></div><select aria-label="Confirmar ou ajustar categoria de {{ lancamento.descricao }}" (change)="confirmarLancamento(lancamento, $event)"><option value="">Confirmar ou ajustar…</option>@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor" [selected]="categoria.valor === lancamento.categoria">{{ categoria.rotulo }}</option> }</select><button type="button" (click)="confirmarSugestao(lancamento)">CONFIRMAR</button></li> }</ul> }
+        </section>
+        <section class="import-group"><header><h3>Confirmados</h3><small>{{ revisaoConfirmados().length }} LANÇAMENTO(S)</small></header>
+          @if (revisaoConfirmados().length === 0) { <p>Nenhum lançamento confirmado ainda.</p> }
+          @else { <ul>@for (lancamento of revisaoConfirmados(); track lancamento.id) { <li><div><strong>{{ lancamento.descricao }}</strong><small>{{ lancamento.nomearquivo }} · {{ lancamento.data }} · {{ formatarValor(lancamento.valor) }} · {{ rotuloCategoria(lancamento.categoria) }}</small><div class="rename-line"><input #descricaoConfirmada [value]="lancamento.descricao" aria-label="Editar descrição de {{ lancamento.descricao }}" maxlength="255"><button type="button" (click)="salvarDescricao(lancamento, descricaoConfirmada.value)">SALVAR NOME</button></div></div><select aria-label="Alterar categoria de {{ lancamento.descricao }}" (change)="confirmarLancamento(lancamento, $event)">@for (categoria of categorias; track categoria.valor) { <option [value]="categoria.valor" [selected]="categoria.valor === lancamento.categoria">{{ categoria.rotulo }}</option> }</select></li> }</ul> }
+        </section>
+      }
+    </section>
+  </div>
+}
+
+@if (notificacoesAbertas()) {
+  <div class="notification-backdrop" role="presentation" (click)="fecharNotificacoesExterno($event)">
+    <section class="notification-panel" role="dialog" aria-modal="true" aria-labelledby="tituloNotificacoes">
+      <header><div><span>SUGESTÕES // ZYVEN</span><h2 id="tituloNotificacoes">Avisos</h2></div><button type="button" aria-label="Fechar avisos" (click)="notificacoesAbertas.set(false)">×</button></header>
+      <p>Um lembrete na hora certa, sem excesso. Configure sua meta e registre água quando quiser.</p>
+      <form class="notification-goal" (submit)="salvarMeta($event)"><label>META DIÁRIA DE DESPESAS (R$)<input name="metadiaria" type="number" min="1" max="1000000" step="0.01" [value]="preferenciasNotificacao()?.metadiaria ?? ''" placeholder="Definir meta"></label><button type="submit">SALVAR META</button></form>
+      <div class="water-status"><span>ÁGUA HOJE · {{ preferenciasNotificacao()?.aguahoje ?? 0 }} / {{ preferenciasNotificacao()?.aguaalvodiaria ?? 2000 }} ML</span><button type="button" (click)="registrarAgua(500)">BEBI 500 ML</button></div>
+      @if (!notificacoesPermitidas()) { <button class="notification-enable" type="button" (click)="ativarNotificacoes()">ATIVAR AVISOS NO DISPOSITIVO</button> }
+      @if (notificacaoMensagem()) { <p role="status">{{ notificacaoMensagem() }}</p> }
+      @if (notificacoesPendentes().length === 0) { <p>Nenhum aviso pendente agora.</p> }
+      @for (item of notificacoesPendentes(); track item.id) { <article class="notification-card"><span>{{ item.tipo }}</span><h3>{{ item.titulo }}</h3><p>{{ item.mensagem }}</p><div>@if (item.tipo === 'AGUA') { <button type="button" (click)="registrarAgua(500)">BEBI 500 ML</button> }@if (item.tipo === 'TREINO') { <button type="button" (click)="notificacoesAbertas.set(false); selecionarModulo('academia')">VER TREINO</button> }@if (item.tipo === 'ORCAMENTO') { <button type="button" (click)="notificacoesAbertas.set(false); selecionarModulo('financeiro')">VER FINANCEIRO</button> }<button type="button" (click)="descartarNotificacao(item)">DISPENSAR</button></div></article> }
     </section>
   </div>
 }

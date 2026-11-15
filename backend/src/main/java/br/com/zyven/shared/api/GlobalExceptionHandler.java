@@ -3,6 +3,9 @@ package br.com.zyven.shared.api;
 import java.time.Instant;
 import java.util.List;
 
+import br.com.zyven.financeiro.domain.ImportacaoDuplicadaException;
+import br.com.zyven.assistente.application.GeminiNaoConfiguradoException;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +32,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiError> handleBusinessValidation(IllegalArgumentException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(ImportacaoDuplicadaException.class)
+    ResponseEntity<ApiError> handleImportacaoDuplicada(ImportacaoDuplicadaException exception, HttpServletRequest request) {
+        return response(HttpStatus.CONFLICT, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(GeminiNaoConfiguradoException.class)
+    ResponseEntity<ApiError> handleGeminiNaoConfigurado(GeminiNaoConfiguradoException exception, HttpServletRequest request) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, List.of());
     }
 
     @ExceptionHandler(AuthenticationException.class)
