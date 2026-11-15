@@ -19,7 +19,13 @@ public class MigrationApplication {
                 .bannerMode(Banner.Mode.OFF)
                 .run(args)) {
             DataSource dataSource = context.getBean(DataSource.class);
-            Flyway.configure().dataSource(dataSource).load().migrate();
+            // A importacao financeira foi historicamente aplicada como V3 na nuvem e V4 localmente.
+            // Ambos os scripts sao identicos; ignore o duplicado pendente abaixo da versao atual.
+            Flyway.configure()
+                    .dataSource(dataSource)
+                    .ignoreMigrationPatterns("*:ignored")
+                    .load()
+                    .migrate();
         } finally {
             System.clearProperty("spring.flyway.enabled");
             System.clearProperty("spring.jpa.hibernate.ddl-auto");

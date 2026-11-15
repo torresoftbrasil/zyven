@@ -10,4 +10,4 @@ RUN apk add --no-cache wget && addgroup -S zyven && adduser -S zyven -G zyven
 COPY --from=build /workspace/backend/target/*.jar /app/zyven.jar
 USER zyven
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/zyven.jar"]
+ENTRYPOINT ["sh", "-c", "java -Dloader.main=br.com.zyven.MigrationApplication -cp /app/zyven.jar org.springframework.boot.loader.launch.PropertiesLauncher && exec java -jar /app/zyven.jar"]
