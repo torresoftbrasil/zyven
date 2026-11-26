@@ -55,6 +55,12 @@ Every screen must preserve the approved Zyven language:
 - Magenta only for exceptional status or a restrained secondary accent.
 - Sparse composition, technical microcopy, thin borders, ambient blue light.
 - The voice waveform remains the persistent core interaction where appropriate.
+- The home screen uses a responsive bento grid to surface agenda, training,
+  hydration, finances, and notifications. Show live data when available and
+  describe missing integrations honestly instead of filling cards with mock data.
+- Keep the animated voice control visible as a floating dock action on desktop
+  and mobile. Tapping it or swiping up opens a text conversation; voice connects
+  after authentication and the home screen greets Tuco on each open.
 - Modules open with the established beam, scan, expansion, and staggered reveal.
 - Module pages use a consistent workspace: title, sub-tabs, summary metrics,
   dashboard content, recent activity, contextual add button, and modal forms.
@@ -158,6 +164,12 @@ tables are an exception to the domain naming rule and must be evolved only by
 Flyway. WebAuthn registration challenges stay in short-lived server memory;
 users can restart registration after a server restart. A device-local passkey
 hint may improve the sign-in UI but must never be treated as authorization.
+On an installed app with a saved passkey hint, request WebAuthn authentication
+before revealing the home screen on each launch. Keep password login as a
+fallback if the browser requires a user gesture or authentication is cancelled.
+The startup screen waits for this decision so the login form does not flash
+before a saved session opens. Respect iPhone safe areas in fixed headers,
+panels, and bottom controls.
 
 ## Installed App and Notifications
 

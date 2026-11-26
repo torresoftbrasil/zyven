@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, computed, HostListener, NgZone, OnDestroy, signal } from '@angular/core';
+import { AfterViewInit, Component, computed, effect, HostListener, NgZone, OnDestroy, signal, untracked } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { VoiceWaveform } from './shared/voice-waveform/voice-waveform';
@@ -7,6 +7,7 @@ import { ZyvenAudioState } from './core/audio/zyven-audio-state';
 import { CategoriaFinanceira, FinanceiroApi, ImportacaoFinanceira, LancamentoFinanceiro, PreviaOfx } from './financeiro/financeiro-api';
 import { AutenticacaoApi } from './core/autenticacao/autenticacao-api';
 import { AcademiaApi, Treino } from './academia/academia-api';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { PasskeyApi } from './core/autenticacao/passkey-api';
 import { Notificacao, NotificacaoApi, PreferenciasNotificacao } from './notificacao/notificacao-api';
 import { NucleoVisual } from './shared/nucleo-visual';
@@ -16,12 +17,13 @@ type ModuloId = 'inicio' | 'financeiro' | 'academia' | 'agenda' | 'tarefas' | 'i
 interface Modulo { id: ModuloId; codigo: string; nome: string; }
 interface Metrica { rotulo: string; valor: string; detalhe: string; }
 interface Atividade { titulo: string; tipo: string; valor: string; }
+interface MensagemChat { papel: 'usuario' | 'zyven'; texto: string; }
 
 @Component({
   selector: 'app-root',
   imports: [VoiceWaveform, ReactiveFormsModule],
   templateUrl: './app.html',
-  styleUrl: './app.css',
+  styleUrls: ['./app.css', './bento.css', './academia/academia.css'],
 })
 export class App implements AfterViewInit, OnDestroy {
   readonly modulos: Modulo[] = [
@@ -32,7 +34,7 @@ export class App implements AfterViewInit, OnDestroy {
     { id: 'tarefas', codigo: '05', nome: 'Tarefas' },
     { id: 'integracoes', codigo: '06', nome: 'Integrações' },
   ];
-  readonly abas = computed(() => this.moduloAtivo() === 'financeiro' ? ['Visão geral', 'Registros', 'Importar OFX'] : this.moduloAtivo() === 'academia' ? ['Treinos', 'Importar fotos'] : ['Visão geral', 'Registros', 'Análises']);
+  readonly abas = computed(() => this.moduloAtivo() === 'financeiro' ? ['Visão geral', 'Registros', 'Importar OFX'] : this.moduloAtivo() === 'academia' ? ['Treinar', 'Importar texto', 'Importar fotos'] : ['Visão geral', 'Registros', 'Análises']);
   readonly grafico = [42, 58, 49, 76, 61, 86];
   readonly moduloAtivo = signal<ModuloId>('inicio');
   readonly painelVisivel = signal(false);
@@ -48,6 +50,12 @@ export class App implements AfterViewInit, OnDestroy {
   readonly modoEntrada = signal<'VOZ' | 'TEXTO'>('VOZ');
   readonly respostaTexto = computed(() => this.respostaComando() || this.geminiLive.erro() || this.geminiLive.respostaTexto());
   readonly comando = new FormControl('', { nonNullable: true });
+  readonly chatAberto = signal(false);
+  readonly mensagensChat = signal<MensagemChat[]>([]);
+  readonly proximoTreino = computed(() => [...this.treinos()].sort((a, b) => a.data.localeCompare(b.data)).find(treino => treino.data >= new Date().toISOString().slice(0, 10)) ?? null);
+  readonly agora = signal(new Date());
+  readonly diaSemanaPainel = computed(() => new Intl.DateTimeFormat('pt-BR', { weekday: 'long' }).format(this.agora()));
+  readonly diaMesPainel = computed(() => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long' }).format(this.agora()));
   readonly lancamentosPendentes = signal<LancamentoFinanceiro[]>([]);
   readonly totalLancados = signal(0);
   readonly totalPendentes = signal(0);
@@ -59,6 +67,22 @@ export class App implements AfterViewInit, OnDestroy {
   readonly fotosPreparadas = signal<File[]>([]);
   readonly treinos = signal<Treino[]>([]);
   readonly previaTreinos = signal<Treino[]>([]);
+  readonly origemPrevia = signal<'FOTO' | 'TEXTO'>('FOTO');
+  readonly textoPlano = new FormControl('', { nonNullable: true });
+  readonly treinoSelecionadoId = signal<string | null>(null);
+  readonly exercicioSelecionadoId = signal<string | null>(null);
+  readonly treinoSelecionado = computed(() => this.treinos().find(item => item.id === this.treinoSelecionadoId()) ?? null);
+  readonly exercicioSelecionado = computed(() => this.treinoSelecionado()?.exercicios.find(item => item.id === this.exercicioSelecionadoId()) ?? null);
+  readonly cargaAtual = signal<number | null>(null);
+  readonly faseTreino = signal<'PRONTO' | 'EXECUTANDO' | 'PAUSA'>('PRONTO');
+  readonly segundosPausa = signal(0);
+  readonly videoAberto = signal<string | null>(null);
+  readonly videoSeguro = computed<SafeResourceUrl | null>(() => {
+    const id = this.videoAberto();
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.youtube-nocookie.com/embed/${id}?autoplay=1`) : null;
+  });
+  readonly buscandoVideo = signal(false);
+  readonly videoManual = new FormControl('', { nonNullable: true });
   readonly academiaCarregando = signal(false);
   readonly academiaMensagem = signal('');
   readonly notificacoes = signal<Notificacao[]>([]);
@@ -76,8 +100,8 @@ export class App implements AfterViewInit, OnDestroy {
   readonly categorias: { valor: CategoriaFinanceira; rotulo: string }[] = [
     { valor: 'ALIMENTACAO', rotulo: 'Alimentação' }, { valor: 'MORADIA', rotulo: 'Moradia' }, { valor: 'TRANSPORTE', rotulo: 'Transporte' }, { valor: 'SAUDE', rotulo: 'Saúde' }, { valor: 'LAZER', rotulo: 'Lazer' }, { valor: 'ASSINATURAS', rotulo: 'Assinaturas' }, { valor: 'EDUCACAO', rotulo: 'Educação' }, { valor: 'COMPRAS', rotulo: 'Compras' }, { valor: 'TARIFAS', rotulo: 'Tarifas' }, { valor: 'TRANSFERENCIAS', rotulo: 'Transferências' }, { valor: 'RECEITAS', rotulo: 'Receitas' }, { valor: 'OUTROS', rotulo: 'Outros' },
   ];
-  readonly horario = signal(this.formatarHorario());
   readonly autenticado = signal(false);
+  readonly acessoCarregando = signal(true);
   readonly autenticando = signal(false);
   readonly loginErro = signal('');
   readonly cadastroFaceId = signal(false);
@@ -103,19 +127,35 @@ export class App implements AfterViewInit, OnDestroy {
   private focoFrame = 0;
   private orbitaFrame = 0;
   private nucleoVisual?: NucleoVisual;
+  private inicioArrasteNucleo = 0;
+  private respostaChatPendente = false;
+  private pausaAte = 0;
+  private readonly pausaInterval: number;
 
   constructor(
     private readonly geminiLive: GeminiLive,
     private readonly financeiroApi: FinanceiroApi,
     private readonly autenticacaoApi: AutenticacaoApi,
     private readonly academiaApi: AcademiaApi,
+    private readonly sanitizer: DomSanitizer,
     readonly passkeyApi: PasskeyApi,
     private readonly notificacaoApi: NotificacaoApi,
     readonly audioState: ZyvenAudioState,
     private readonly zone: NgZone,
   ) {
-    this.clockInterval = window.setInterval(() => this.horario.set(this.formatarHorario()), 1000);
+    effect(() => {
+      const resposta = this.respostaTexto();
+      if (!resposta || !this.respostaChatPendente) return;
+      untracked(() => this.mensagensChat.update(mensagens => {
+        const ultima = mensagens.at(-1);
+        if (ultima?.papel !== 'zyven') return mensagens;
+        return [...mensagens.slice(0, -1), { papel: 'zyven', texto: resposta }];
+      }));
+      this.rolarChat();
+    });
+    this.clockInterval = window.setInterval(() => this.agora.set(new Date()), 60_000);
     this.notificacaoInterval = window.setInterval(() => { if (this.autenticado()) void this.avaliarNotificacoes(); }, 15 * 60 * 1000);
+    this.pausaInterval = window.setInterval(() => this.atualizarPausa(), 250);
     void this.recuperarSessao();
     this.geminiLive.definirAcoesFinanceiras({
       prepararImportacao: () => this.prepararImportacao(),
@@ -188,6 +228,7 @@ export class App implements AfterViewInit, OnDestroy {
     cancelAnimationFrame(this.orbitaFrame);
     clearInterval(this.clockInterval);
     clearInterval(this.notificacaoInterval);
+    clearInterval(this.pausaInterval);
     if (this.importacaoInterval) clearInterval(this.importacaoInterval);
     void this.geminiLive.disconnect();
   }
@@ -197,7 +238,7 @@ export class App implements AfterViewInit, OnDestroy {
     if (modulo === 'inicio') { this.fecharPainel(); return; }
     this.moduloAtivo.set(modulo);
     if (atualizarVoz) void this.geminiLive.definirModulo(modulo).catch(() => this.respostaComando.set('Não foi possível atualizar o contexto da voz.'));
-    this.abaAtiva.set(modulo === 'academia' ? 'Treinos' : 'Visão geral');
+    this.abaAtiva.set(modulo === 'academia' ? 'Treinar' : 'Visão geral');
     this.painelFechando.set(false);
     this.painelVisivel.set(true);
     if (modulo === 'financeiro') void this.carregarFinanceiro();
@@ -290,6 +331,9 @@ export class App implements AfterViewInit, OnDestroy {
       this.nucleoVisual?.destruir();
       this.nucleoVisual = undefined;
       this.autenticado.set(false);
+      this.chatAberto.set(false);
+      this.mensagensChat.set([]);
+      this.respostaChatPendente = false;
       this.usuario.set('');
       this.arquivoPreparado.set(null);
       this.termoRevisao.set('');
@@ -311,16 +355,20 @@ export class App implements AfterViewInit, OnDestroy {
       .finally(() => this.cadastrandoFaceId.set(false));
   }
 
-  entrarComFaceId(automatico = false): void {
+  async entrarComFaceId(automatico = false): Promise<void> {
     if (this.autenticando()) return;
     this.autenticando.set(true);
     this.loginErro.set('');
-    void this.passkeyApi.entrar(this.passkeyApi.temChaveNesteDispositivo())
-      .then(() => this.autenticacaoApi.sessao()).then(sessao => this.iniciarSessao(sessao.login))
-      .catch((erro: unknown) => this.loginErro.set(automatico
+    try {
+      await this.passkeyApi.entrar(this.passkeyApi.temChaveNesteDispositivo());
+      this.iniciarSessao((await this.autenticacaoApi.sessao()).login);
+    } catch (erro: unknown) {
+      this.loginErro.set(automatico
         ? 'Toque em ENTRAR COM FACE ID para confirmar neste iPhone, ou use sua senha.'
-        : erro instanceof Error ? erro.message : 'Não foi possível entrar com Face ID.'))
-      .finally(() => this.autenticando.set(false));
+        : erro instanceof Error ? erro.message : 'Não foi possível entrar com Face ID.');
+    } finally {
+      this.autenticando.set(false);
+    }
   }
 
   importarOfx(evento: Event): void {
@@ -369,6 +417,7 @@ export class App implements AfterViewInit, OnDestroy {
     try {
       const previa = await this.academiaApi.previa(this.fotosPreparadas());
       this.previaTreinos.set(previa);
+      this.origemPrevia.set('FOTO');
       const mensagem = `Encontrei ${previa.length} treino(s) nas fotos. Confira a prévia. Posso importar?`;
       this.academiaMensagem.set(mensagem);
       return mensagem;
@@ -382,7 +431,7 @@ export class App implements AfterViewInit, OnDestroy {
       const salvos = await this.academiaApi.confirmar(this.previaTreinos());
       this.previaTreinos.set([]); this.fotosPreparadas.set([]);
       await this.carregarTreinos();
-      this.abaAtiva.set('Treinos');
+      this.abaAtiva.set('Treinar');
       const mensagem = `${salvos.length} treino(s) importado(s). Confira as datas e exercícios na Academia.`;
       this.academiaMensagem.set(mensagem);
       void this.avaliarNotificacoes();
@@ -391,9 +440,146 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   private async carregarTreinos(): Promise<void> {
-    try { this.treinos.set(await this.academiaApi.listar()); }
+    try {
+      const itens = await this.academiaApi.listar();
+      this.treinos.set(itens);
+      if (!itens.some(item => item.id === this.treinoSelecionadoId())) {
+        const hoje = new Date().toLocaleDateString('sv-SE');
+        this.selecionarTreino(itens.find(item => item.data >= hoje) ?? itens[0]);
+      }
+    }
     catch { this.academiaMensagem.set('Não foi possível carregar os treinos.'); }
   }
+
+  async lerTextoTreino(texto = this.textoPlano.value): Promise<string> {
+    this.academiaCarregando.set(true);
+    this.academiaMensagem.set('Lendo o plano e organizando os próximos dias…');
+    try {
+      const previa = await this.academiaApi.previaTexto(texto);
+      this.previaTreinos.set(previa);
+      this.origemPrevia.set('TEXTO');
+      this.selecionarModulo('academia', undefined, false);
+      this.abaAtiva.set('Importar texto');
+      const mensagem = `Organizei ${previa.length} treinos a partir do texto. Confira dias, séries e pausas na prévia; posso importar?`;
+      this.academiaMensagem.set(mensagem);
+      return mensagem;
+    } catch (erro) {
+      const mensagem = erro instanceof HttpErrorResponse ? (erro.error?.message ?? 'Não foi possível interpretar o plano.') : erro instanceof Error ? erro.message : 'Não foi possível interpretar o plano.';
+      this.academiaMensagem.set(mensagem);
+      return mensagem;
+    } finally { this.academiaCarregando.set(false); }
+  }
+
+  async confirmarTextoTreino(): Promise<string> {
+    if (!this.previaTreinos().length || this.origemPrevia() !== 'TEXTO') return 'Não há plano de texto aguardando confirmação.';
+    try {
+      const salvos = await this.academiaApi.confirmarTexto(this.previaTreinos());
+      this.previaTreinos.set([]);
+      this.textoPlano.setValue('');
+      await this.carregarTreinos();
+      this.abaAtiva.set('Treinar');
+      const mensagem = `${salvos.length} treinos importados. Escolha o dia para começar.`;
+      this.academiaMensagem.set(mensagem);
+      return mensagem;
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : 'Não foi possível salvar o plano.';
+      this.academiaMensagem.set(mensagem);
+      return mensagem;
+    }
+  }
+
+  selecionarTreino(treino?: Treino): void {
+    this.treinoSelecionadoId.set(treino?.id ?? null);
+    const primeiro = treino?.exercicios.find(item => item.seriesconcluidas < this.totalSeries(item.series)) ?? treino?.exercicios[0];
+    this.selecionarExercicio(primeiro?.id ?? null);
+  }
+
+  selecionarExercicio(id: string | null): void {
+    this.exercicioSelecionadoId.set(id);
+    this.cargaAtual.set(this.treinoSelecionado()?.exercicios.find(item => item.id === id)?.carga ?? null);
+    this.faseTreino.set('PRONTO');
+    this.pausaAte = 0;
+    this.segundosPausa.set(0);
+    this.videoManual.setValue('');
+  }
+
+  totalSeries(series: string): number { return Math.max(1, Math.min(30, Number(series.match(/^\d+/)?.[0] ?? 1))); }
+
+  atualizarCarga(evento: Event): void {
+    const valor = (evento.target as HTMLInputElement).value;
+    this.cargaAtual.set(valor === '' ? null : Number(valor));
+  }
+
+  async avancarSerie(): Promise<void> {
+    const treino = this.treinoSelecionado();
+    const exercicio = this.exercicioSelecionado();
+    if (!treino?.id || !exercicio?.id || this.faseTreino() === 'PAUSA') return;
+    if (this.faseTreino() === 'PRONTO') { this.faseTreino.set('EXECUTANDO'); return; }
+    try {
+      const atualizado = await this.academiaApi.concluirSerie(treino.id, exercicio.id, this.cargaAtual());
+      this.treinos.update(itens => itens.map(item => item.id === atualizado.id ? atualizado : item));
+      const atual = atualizado.exercicios.find(item => item.id === exercicio.id)!;
+      if (atual.seriesconcluidas >= this.totalSeries(atual.series)) {
+        const proximo = atualizado.exercicios.find(item => item.seriesconcluidas < this.totalSeries(item.series));
+        if (proximo) {
+          this.selecionarExercicio(proximo.id);
+          this.pausaAte = Date.now() + atual.pausasegundos * 1000;
+          this.segundosPausa.set(atual.pausasegundos);
+          this.faseTreino.set(atual.pausasegundos ? 'PAUSA' : 'PRONTO');
+          this.academiaMensagem.set(`${atual.nome} concluído. Após a pausa: ${proximo.nome}.`);
+        }
+        else { this.faseTreino.set('PRONTO'); this.academiaMensagem.set('Treino concluído. Bom trabalho!'); this.avisarFimPausa('Treino concluído'); }
+      } else {
+        this.pausaAte = Date.now() + atual.pausasegundos * 1000;
+        this.segundosPausa.set(atual.pausasegundos);
+        this.faseTreino.set(atual.pausasegundos ? 'PAUSA' : 'PRONTO');
+      }
+    } catch { this.academiaMensagem.set('Não foi possível registrar a série. Tente novamente.'); }
+  }
+
+  private atualizarPausa(): void {
+    if (this.faseTreino() !== 'PAUSA') return;
+    const restante = Math.max(0, Math.ceil((this.pausaAte - Date.now()) / 1000));
+    this.segundosPausa.set(restante);
+    if (restante === 0) { this.faseTreino.set('PRONTO'); this.avisarFimPausa('Pausa concluída. Próxima série pronta.'); }
+  }
+
+  private avisarFimPausa(mensagem: string): void {
+    this.academiaMensagem.set(mensagem);
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('Zyven · Academia', { body: mensagem });
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(180);
+  }
+
+  async encontrarVideo(): Promise<void> {
+    const treino = this.treinoSelecionado();
+    const exercicio = this.exercicioSelecionado();
+    if (!treino?.id || !exercicio?.id) return;
+    this.buscandoVideo.set(true);
+    try {
+      const url = await this.academiaApi.buscarVideo(exercicio.nome);
+      const atualizado = await this.academiaApi.salvarVideo(treino.id, exercicio.id, url);
+      this.treinos.update(itens => itens.map(item => item.id === atualizado.id ? atualizado : item));
+      this.academiaMensagem.set('Vídeo encontrado. Confira se a execução corresponde ao seu exercício.');
+    } catch (erro) { this.academiaMensagem.set(erro instanceof HttpErrorResponse ? (erro.error?.message ?? 'Não foi possível buscar o vídeo.') : 'Não foi possível buscar o vídeo.'); }
+    finally { this.buscandoVideo.set(false); }
+  }
+
+  async adicionarVideoManual(): Promise<void> {
+    const treino = this.treinoSelecionado();
+    const exercicio = this.exercicioSelecionado();
+    const id = this.videoManual.value.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1];
+    if (!treino?.id || !exercicio?.id || !id) { this.academiaMensagem.set('Cole um link válido de vídeo do YouTube.'); return; }
+    try {
+      const atualizado = await this.academiaApi.salvarVideo(treino.id, exercicio.id, `https://www.youtube.com/watch?v=${id}`);
+      this.treinos.update(itens => itens.map(item => item.id === atualizado.id ? atualizado : item));
+      this.videoManual.setValue('');
+      this.academiaMensagem.set('Vídeo salvo para este exercício. Confira a execução antes de usar.');
+    } catch { this.academiaMensagem.set('Não foi possível salvar este vídeo.'); }
+  }
+
+  idVideo(url: string | null): string | null { return url?.match(/[?&]v=([A-Za-z0-9_-]{11})/)?.[1] ?? null; }
+  encodeURIComponent(valor: string): string { return encodeURIComponent(valor); }
+  abrirVideo(url: string | null): void { this.videoAberto.set(this.idVideo(url)); }
 
   moverTreino(treino: Treino, data: string): void {
     if (!treino.id || !data) return;
@@ -468,7 +654,16 @@ export class App implements AfterViewInit, OnDestroy {
     const texto = this.comando.value.trim();
     if (!texto || !this.autenticado()) return;
     this.comando.setValue('');
+    this.modoEntrada.set('TEXTO');
+    this.respostaChatPendente = true;
+    this.mensagensChat.update(mensagens => [...mensagens, { papel: 'usuario', texto }, { papel: 'zyven', texto: 'Aguardando resposta…' }]);
+    this.rolarChat();
     const normalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (/\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)(-feira)?\s*:/.test(normalizado) && /\b\d+\s*x\s*\d+\b/.test(normalizado)) {
+      this.textoPlano.setValue(texto);
+      void this.lerTextoTreino(texto).then(mensagem => this.respostaComando.set(mensagem));
+      return;
+    }
     if (/\bofx\b/.test(normalizado) && /\b(importar|importe|ler|leia|abrir|abra|carregar|envie)\b/.test(normalizado)) {
       void this.prepararImportacao();
       return;
@@ -482,7 +677,7 @@ export class App implements AfterViewInit, OnDestroy {
       return;
     }
     if (this.previaTreinos().length && /^(sim|pode|confirmo|confirma|importa|importe)(\b|\s)/.test(normalizado)) {
-      void this.confirmarFotosTreino().then(mensagem => this.respostaComando.set(mensagem));
+      void (this.origemPrevia() === 'TEXTO' ? this.confirmarTextoTreino() : this.confirmarFotosTreino()).then(mensagem => this.respostaComando.set(mensagem));
       return;
     }
     if ((this.previaOfx() || this.previaTreinos().length) && /^(nao|agora nao|cancela|cancelar)\b/.test(normalizado)) {
@@ -499,7 +694,15 @@ export class App implements AfterViewInit, OnDestroy {
     });
   }
 
+  teclaChat(evento: KeyboardEvent): void {
+    if (evento.key === 'Enter' && !evento.shiftKey && !evento.isComposing) {
+      evento.preventDefault();
+      (evento.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
+    }
+  }
+
   iniciarVoz(): void {
+    this.respostaChatPendente = false;
     this.modoEntrada.set('VOZ');
     this.respostaComando.set('');
     void this.geminiLive.connect('VOZ').catch((erro: unknown) => {
@@ -517,6 +720,20 @@ export class App implements AfterViewInit, OnDestroy {
     this.modoEntrada.set('TEXTO');
     this.geminiLive.usarTexto();
     this.respostaComando.set('');
+  }
+
+  abrirChat(): void { this.chatAberto.set(true); this.rolarChat(); }
+  fecharChat(): void { this.chatAberto.set(false); }
+  iniciarArrasteNucleo(evento: PointerEvent): void { this.inicioArrasteNucleo = evento.clientY; }
+  finalizarArrasteNucleo(evento: PointerEvent): void {
+    if (this.inicioArrasteNucleo - evento.clientY > 28) this.abrirChat();
+    this.inicioArrasteNucleo = 0;
+  }
+  private rolarChat(): void {
+    requestAnimationFrame(() => {
+      const mensagens = document.querySelector<HTMLElement>('.chat-messages');
+      if (mensagens) mensagens.scrollTop = mensagens.scrollHeight;
+    });
   }
 
   private abrirImportacao(): void {
@@ -681,7 +898,7 @@ export class App implements AfterViewInit, OnDestroy {
   }
 
   @HostListener('document:keydown.escape')
-  fecharComEscape(): void { if (this.cadastroFaceId()) this.cadastroFaceId.set(false); else if (this.notificacoesAbertas()) this.notificacoesAbertas.set(false); else if (this.importacoesAbertas()) this.fecharImportacoes(); else if (this.modalAberto()) this.fecharModal(); else this.fecharPainel(); }
+  fecharComEscape(): void { if (this.videoAberto()) this.videoAberto.set(null); else if (this.cadastroFaceId()) this.cadastroFaceId.set(false); else if (this.notificacoesAbertas()) this.notificacoesAbertas.set(false); else if (this.importacoesAbertas()) this.fecharImportacoes(); else if (this.modalAberto()) this.fecharModal(); else if (this.chatAberto()) this.fecharChat(); else this.fecharPainel(); }
 
   abrirNotificacoes(): void { this.notificacoesAbertas.set(true); void this.avaliarNotificacoes(); }
   fecharNotificacoesExterno(evento: MouseEvent): void { if (evento.target === evento.currentTarget) this.notificacoesAbertas.set(false); }
@@ -732,18 +949,29 @@ export class App implements AfterViewInit, OnDestroy {
     }
   }
 
-  private formatarHorario(): string { return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date()); }
   private async recuperarSessao(): Promise<void> {
-    try { this.iniciarSessao((await this.autenticacaoApi.sessao()).login); }
-    catch {
-      if (this.passkeyApi.instalado && this.passkeyApi.temChaveNesteDispositivo()) this.entrarComFaceId(true);
+    try {
+      if (this.passkeyApi.instalado && this.passkeyApi.temChaveNesteDispositivo()) {
+        await this.entrarComFaceId(true);
+      } else {
+        this.iniciarSessao((await this.autenticacaoApi.sessao()).login);
+      }
+    } catch {
+      // Sem sessão ativa: o formulário de acesso será exibido.
+    } finally {
+      this.acessoCarregando.set(false);
     }
   }
   private iniciarSessao(login: string): void {
+    if (this.autenticado()) return;
     this.usuario.set(login);
     this.autenticado.set(true);
+    this.mensagensChat.set([{ papel: 'zyven', texto: 'Olá Tuco.' }]);
     requestAnimationFrame(() => this.iniciarNucleoVisual());
+    this.geminiLive.solicitarSaudacaoInicial();
     this.iniciarVoz();
+    void this.carregarFinanceiro();
+    void this.carregarTreinos();
     void this.avaliarNotificacoes();
     const parametros = new URLSearchParams(window.location.search);
     if (parametros.get('acao') === 'agua500') { this.registrarAgua(500); window.history.replaceState(null, '', '/'); }

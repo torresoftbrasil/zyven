@@ -5,6 +5,7 @@ import java.util.List;
 
 import br.com.zyven.financeiro.domain.ImportacaoDuplicadaException;
 import br.com.zyven.assistente.application.GeminiNaoConfiguradoException;
+import br.com.zyven.academia.domain.TreinoInvalidoException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiError> handleBusinessValidation(IllegalArgumentException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(TreinoInvalidoException.class)
+    ResponseEntity<ApiError> handleTreinoInvalido(TreinoInvalidoException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, List.of());
     }
 

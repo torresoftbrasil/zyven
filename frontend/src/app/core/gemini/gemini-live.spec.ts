@@ -5,6 +5,20 @@ import { GeminiLive } from './gemini-live';
 import { vi } from 'vitest';
 
 describe('GeminiLive', () => {
+  it('fala a saudação inicial quando a sessão de voz fica pronta, uma única vez', () => {
+    const live = new GeminiLive({} as HttpClient, new ZyvenAudioState());
+    const enviar = vi.fn();
+    live['session'] = { sendClientContent: enviar } as unknown as NonNullable<GeminiLive['session']>;
+    live['startMicrophone'] = vi.fn().mockResolvedValue(undefined);
+    live.solicitarSaudacaoInicial();
+    expect(enviar).not.toHaveBeenCalled();
+
+    live['handleMessage']({ setupComplete: true } as unknown as LiveServerMessage);
+    live['handleMessage']({ setupComplete: true } as unknown as LiveServerMessage);
+    expect(enviar).toHaveBeenCalledOnce();
+    expect(enviar.mock.calls[0][0].turns[0].parts[0].text).toContain('Olá Tuco.');
+  });
+
   it('encaminha a prévia mesmo quando a ferramenta chega antes da transcrição', async () => {
     const live = new GeminiLive({} as HttpClient, new ZyvenAudioState());
     const preparar = vi.fn().mockResolvedValue('Prévia pronta. Posso importar?');

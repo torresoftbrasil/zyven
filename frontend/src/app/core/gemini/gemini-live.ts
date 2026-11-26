@@ -69,10 +69,25 @@ export class GeminiLive {
   private emEspera = false;
   private reconhecimento?: ReconhecimentoVoz;
   private comandoDaChamada = '';
+  private saudacaoInicialPendente = false;
 
   constructor(private readonly http: HttpClient, private readonly audioState: ZyvenAudioState) {}
 
   definirAcoesFinanceiras(acoes: AcoesFinanceirasVoz): void { this.acoesFinanceiras = acoes; }
+
+  solicitarSaudacaoInicial(): void {
+    this.saudacaoInicialPendente = true;
+    this.enviarSaudacaoInicial();
+  }
+
+  private enviarSaudacaoInicial(): void {
+    if (!this.saudacaoInicialPendente || !this.setupComplete || this.modo !== 'VOZ' || !this.session) return;
+    this.session.sendClientContent({
+      turns: [{ role: 'user', parts: [{ text: 'Ao iniciar, diga somente “Olá Tuco.” em voz, de forma breve e natural. Depois aguarde meu pedido.' }] }],
+      turnComplete: true,
+    });
+    this.saudacaoInicialPendente = false;
+  }
 
   async definirModulo(modulo: string): Promise<void> {
     if (this.modulo === modulo) return;
@@ -92,7 +107,10 @@ export class GeminiLive {
     this.erro.set('');
     if (modo === 'VOZ') this.audioState.status.set('CONECTANDO');
     if (this.session) {
-      if (modo === 'VOZ') await this.startMicrophone();
+      if (modo === 'VOZ') {
+        void this.outputContext?.resume().catch(() => undefined);
+        await this.startMicrophone();
+      }
       else this.stopMicrophone();
       return;
     }
@@ -151,6 +169,7 @@ export class GeminiLive {
         ] }],
       },
     });
+    this.enviarSaudacaoInicial();
     if (this.setupComplete && this.modo === 'VOZ') await this.startMicrophone();
   }
 
@@ -244,6 +263,7 @@ export class GeminiLive {
       this.setupComplete = true;
       this.audioState.connected.set(true);
       this.audioState.status.set('OUVINDO');
+      this.enviarSaudacaoInicial();
       if (this.modo === 'VOZ') void this.startMicrophone().catch((erro: unknown) => {
         this.audioState.status.set('MICROFONE INDISPONÍVEL');
         this.erro.set(erro instanceof DOMException && erro.name === 'NotAllowedError'
@@ -365,6 +385,7 @@ export class GeminiLive {
       if (this.microphone && this.session) this.session.sendRealtimeInput({ audioStreamEnd: true });
     }
     const outputContext = this.ensureOutputAudio();
+    if (outputContext.state === 'suspended') void outputContext.resume().catch(() => undefined);
     const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
     const samples = new Int16Array(bytes.buffer);
     const buffer = outputContext.createBuffer(1, samples.length, 24000);

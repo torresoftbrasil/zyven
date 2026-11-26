@@ -3,10 +3,17 @@
     <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
     <span>Z Y V E N</span>
   </a>
-  <div class="system-state"><i [class.active]="audioState.connected()"></i><span>{{ audioState.status() }}</span><span>//</span><time>{{ horario() }}</time>@if (autenticado()) { <button type="button" class="logout notification-trigger" (click)="abrirNotificacoes()" [attr.aria-label]="'Notificações, ' + notificacoesPendentes().length + ' pendentes'">AVISOS @if (notificacoesPendentes().length) { <b>{{ notificacoesPendentes().length }}</b> }</button>@if (passkeyApi.disponivel && passkeyApi.instalado) { <button type="button" class="logout" (click)="registrarFaceId()">ATIVAR FACE ID</button> }<button type="button" class="logout" (click)="sair()">SAIR</button> }</div>
+  <div class="system-state"><i [class.active]="audioState.connected()"></i><span class="sr-only">{{ audioState.status() }}</span>@if (autenticado()) { <button type="button" class="logout notification-trigger" (click)="abrirNotificacoes()" [attr.aria-label]="'Notificações, ' + notificacoesPendentes().length + ' pendentes'">Avisos @if (notificacoesPendentes().length) { <b>{{ notificacoesPendentes().length }}</b> }</button>@if (passkeyApi.disponivel && passkeyApi.instalado) { <button type="button" class="logout" (click)="registrarFaceId()">Ativar Face ID</button> }<button type="button" class="logout" (click)="sair()">Sair</button> }</div>
 </header>
 
-@if (!autenticado()) {
+@if (acessoCarregando()) {
+  <section class="access-intro" role="status" aria-live="polite">
+    <span class="intro-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+    <strong>Z Y V E N</strong>
+    <span class="intro-scan" aria-hidden="true"></span>
+    <p>{{ passkeyApi.instalado && passkeyApi.temChaveNesteDispositivo() ? 'CONFIRME O FACE ID PARA ENTRAR' : 'PREPARANDO SEU ESPAÇO' }}</p>
+  </section>
+} @else if (!autenticado()) {
   <section class="access-lock" aria-labelledby="tituloAcesso">
     <span>ACESSO PRIVADO // ZYVEN</span>
     <h1 id="tituloAcesso">Identifique-se</h1>
@@ -34,54 +41,47 @@
   </section>
 }
 
-<main>
+<main class="bento-main">
   @if (arrastandoArquivo()) { <div class="drop-overlay" aria-hidden="true"><strong>SOLTE O ARQUIVO</strong><small>OFX ou foto de treino · preparado neste navegador</small></div> }
-  <section class="voice" [class.panel-open]="painelVisivel() && !painelFechando()" aria-label="Interface de voz Zyven" (pointermove)="moverFoco($event)" (pointerleave)="limparFoco($event)">
-    <app-voice-waveform />
-    @if (autenticado()) {
-      <nav class="atom-nav" aria-label="Módulos do Zyven">
-        <canvas class="nucleus-canvas" aria-hidden="true"></canvas>
-        <button type="button" class="core-trigger" aria-label="Acionar pulso de luz do núcleo" (click)="acionarNucleo($event)"></button>
-        <span class="field-ring field-ring-a" aria-hidden="true"></span>
-        <span class="field-ring field-ring-b" aria-hidden="true"></span>
-        <span class="orbit-track" aria-hidden="true"></span>
-        @for (modulo of modulos; track modulo.id) {
-          @if (modulo.id !== 'inicio') {
-            <button type="button" class="orbit-option" [class.active]="moduloAtivo() === modulo.id" [attr.data-module]="modulo.id" [attr.aria-label]="'Abrir ' + modulo.nome" (click)="selecionarModulo(modulo.id)">
-              <span class="orbit-icon" aria-hidden="true">
-                @switch (modulo.id) {
-                  @case ('financeiro') { <svg viewBox="0 0 32 32"><rect x="5" y="10" width="22" height="17" rx="2"/><path d="M5 15h22M10 10V6h12v4M21 21h3"/></svg> }
-                  @case ('academia') { <svg viewBox="0 0 32 32"><path d="M3 13v6m4-9v12m4-9v6m10-6v6m4-9v12m4-9v6M11 16h10"/></svg> }
-                  @case ('agenda') { <svg viewBox="0 0 32 32"><rect x="5" y="8" width="22" height="20" rx="2"/><path d="M10 4v8m12-8v8M5 14h22M11 20h3m5 0h3m-11 4h3"/></svg> }
-                  @case ('tarefas') { <svg viewBox="0 0 32 32"><rect x="6" y="5" width="20" height="23" rx="2"/><path d="m10 13 2 2 4-4m3 3h4m-13 7 2 2 4-4m3 3h4"/></svg> }
-                  @case ('integracoes') { <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="4"/><circle cx="5" cy="7" r="2"/><circle cx="27" cy="7" r="2"/><circle cx="16" cy="28" r="2"/><path d="M7 8.5 13 13M25 8.5 19 13m-3 7v6"/></svg> }
-                }
-              </span>
-              <span class="orbit-name">{{ modulo.nome }}</span>
-            </button>
-          }
-        }
-      </nav>
-      <div class="assistant-controls">
-        @if (arquivoPreparado(); as arquivo) { <div class="staged-file" role="status"><span>OFX PREPARADO <strong>{{ arquivo.name }}</strong></span><button type="button" (click)="arquivoPreparado.set(null)" aria-label="Remover arquivo preparado">×</button></div> }
-        @if (fotosPreparadas().length) { <div class="staged-file" role="status"><span>FOTOS PREPARADAS <strong>{{ fotosPreparadas().length }} para leitura de treinos</strong></span><button type="button" (click)="fotosPreparadas.set([]); previaTreinos.set([])" aria-label="Remover fotos preparadas">×</button></div> }
-        <div class="input-switch" role="group" aria-label="Modo de interação">
-          <button type="button" [class.active]="modoEntrada() === 'VOZ'" [attr.aria-pressed]="modoEntrada() === 'VOZ'" (click)="iniciarVoz()">{{ audioState.status() === 'AGUARDANDO ZYVEN' ? 'AGUARDANDO ZYVEN' : audioState.connected() && audioState.listening() ? 'VOZ ATIVA' : 'INICIAR VOZ' }}</button>
-          <button type="button" [class.active]="modoEntrada() === 'TEXTO'" [attr.aria-pressed]="modoEntrada() === 'TEXTO'" (click)="usarTexto()">DIGITAR</button>
+  @if (autenticado()) {
+    <div class="bento-content">
+      <section class="bento-heading" aria-labelledby="tituloPainelDia">
+        <div><div class="bento-greeting"><i class="bento-connection" [class.offline]="!audioState.connected()" [attr.aria-label]="audioState.connected() ? 'Voz conectada' : 'Voz desconectada'" role="img"></i><h1 id="tituloPainelDia">Olá Tuco.</h1></div><p class="bento-date"><span>{{ diaSemanaPainel() }}</span><span>{{ diaMesPainel() }}</span></p><p class="bento-subtitle">O que importa agora, em um só lugar.</p></div>
+      </section>
+      <section class="bento-grid" aria-label="Painel do dia">
+        <button type="button" class="bento-card bento-wide" (click)="selecionarModulo('agenda')">
+          <span class="bento-card-head"><span class="bento-symbol">▣</span><span>AGENDA</span><small>HOJE</small></span>
+          <span class="bento-card-body"><span class="bento-muted">PRÓXIMO COMPROMISSO</span><strong>Organize seu dia com Zyven</strong><span class="bento-muted">Abra a agenda para ver seus registros.</span></span>
+          <span class="bento-card-foot">VER AGENDA <span aria-hidden="true">↗</span></span>
+        </button>
+        <button type="button" class="bento-card bento-half" (click)="selecionarModulo('academia')">
+          <span class="bento-card-head"><span class="bento-symbol">⌁</span><small>{{ proximoTreino() ? 'PROGRAMADO' : 'SEM TREINO' }}</small></span>
+          <span class="bento-kicker">TREINO</span><strong>{{ proximoTreino()?.titulo ?? 'Nenhum treino próximo' }}</strong><span class="bento-muted">{{ proximoTreino() ? proximoTreino()!.exercicios.length + ' exercícios · ' + proximoTreino()!.data : 'Adicione treinos em Academia' }}</span>
+          <span class="bento-card-foot">ABRIR <span aria-hidden="true">↗</span></span>
+        </button>
+        <div class="bento-card bento-half bento-water">
+          <span class="bento-card-head"><span class="bento-symbol">♧</span><small>{{ (preferenciasNotificacao()?.aguahoje ?? 0) / 1000 }} L</small></span>
+          <span class="bento-kicker">ÁGUA</span><strong>{{ preferenciasNotificacao()?.aguahoje ?? 0 }} <span class="bento-unit">/ {{ preferenciasNotificacao()?.aguaalvodiaria ?? 2000 }} ml</span></strong>
+          <span class="bento-muted">Sua hidratação de hoje</span><span class="bento-progress"><i [style.width.%]="((preferenciasNotificacao()?.aguahoje ?? 0) / (preferenciasNotificacao()?.aguaalvodiaria ?? 2000)) * 100"></i></span>
+          <button type="button" class="bento-action" (click)="registrarAgua(250)">+ ÁGUA 250 ML</button>
         </div>
-        <div class="attachment-control"><button type="button" class="attachment-trigger" aria-label="Adicionar arquivo ou foto" [attr.aria-expanded]="menuAnexosAberto()" (click)="menuAnexosAberto.set(!menuAnexosAberto())">+</button>@if (menuAnexosAberto()) { <div class="attachment-menu"><label>ESCOLHER ARQUIVO<input type="file" accept=".ofx,image/*" multiple (change)="escolherAnexo($event)"></label><label>TIRAR FOTO<input type="file" accept="image/*" capture="environment" (change)="escolherAnexo($event)"></label></div> }</div>
-        @if (modoEntrada() === 'TEXTO') { <form (submit)="enviarComando($event)">
-          <label for="comandoZyven">Mensagem para Zyven</label>
-          <div><input id="comandoZyven" [formControl]="comando" placeholder="Escreva um pedido ou 'importar OFX'" maxlength="500" autocomplete="off"><button type="submit">ENVIAR</button></div>
-        </form> }
-        @if (respostaTexto()) { <p class="assistant-response" role="status" aria-live="polite">{{ respostaTexto() }}</p> }
-      </div>
-    }
-  </section>
-
+        <button type="button" class="bento-card bento-wide" (click)="selecionarModulo('financeiro')">
+          <span class="bento-card-head"><span class="bento-symbol">▤</span><span>FINANÇAS</span><small>{{ totalPendentes() }} PARA REVISAR</small></span>
+          <span class="bento-card-body"><strong>{{ totalLancados() }} lançamentos registrados</strong><span class="bento-muted">{{ totalPendentes() ? 'Há lançamentos esperando sua revisão.' : 'Nenhum lançamento aguardando revisão.' }}</span></span>
+          <span class="bento-card-foot">VER FINANÇAS <span aria-hidden="true">↗</span></span>
+        </button>
+        <button type="button" class="bento-card bento-wide" (click)="abrirNotificacoes()">
+          <span class="bento-card-head"><span class="bento-symbol">✧</span><span>AVISOS</span><small>{{ notificacoesPendentes().length }} PENDENTES</small></span>
+          <span class="bento-card-body"><strong>{{ notificacoesPendentes().length ? notificacoesPendentes()[0].titulo : 'Tudo em dia por aqui' }}</strong><span class="bento-muted">{{ notificacoesPendentes().length ? notificacoesPendentes()[0].mensagem : 'Novos lembretes aparecem neste painel.' }}</span></span>
+          <span class="bento-card-foot">VER AVISOS <span aria-hidden="true">↗</span></span>
+        </button>
+      </section>
+      <nav class="bento-modules" aria-label="Outros módulos"><button type="button" (click)="selecionarModulo('tarefas')">TAREFAS ↗</button><button type="button" (click)="selecionarModulo('integracoes')">INTEGRAÇÕES ↗</button></nav>
+    </div>
+  }
   @if (painelVisivel()) {
     <button class="backdrop" [class.closing]="painelFechando()" type="button" aria-label="Fechar painel" (click)="fecharPainel()"></button>
-    <section class="workspace" [class.closing]="painelFechando()" aria-labelledby="tituloModulo">
+    <section class="workspace" [class.closing]="painelFechando()" [class.gym-fullscreen]="moduloAtivo() === 'academia'" aria-labelledby="tituloModulo">
       <div class="panel-scan" aria-hidden="true"></div>
       <div class="panel-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <header class="panel-header">
@@ -116,13 +116,35 @@
             @if (abaAtiva() === 'Importar fotos') {
               <header><span>EXTRAÇÃO VISUAL // ACADEMIA</span><h2>Treinos das fotos</h2></header>
               <p>Adicione prints do professor pelo botão +. As fotos ficam neste navegador até você pedir a leitura. Confira a prévia antes de salvar.</p>
-              <label class="gym-photo-picker">ADICIONAR FOTOS<input type="file" accept="image/jpeg,image/png,image/webp" multiple (change)="escolherAnexo($event)"></label>
-              @if (fotosPreparadas().length) { <p>{{ fotosPreparadas().length }} foto(s) preparada(s)</p><button type="button" (click)="lerFotosTreino()" [disabled]="academiaCarregando()">{{ academiaCarregando() ? 'LENDO FOTOS...' : 'LER TREINOS COM IA' }}</button> }
-              @if (previaTreinos().length) { <div class="gym-preview"><h3>Prévia para confirmar</h3>@for (treino of previaTreinos(); track $index) { <article><strong>{{ treino.data }} · {{ treino.titulo }}</strong><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} · {{ exercicio.series }} · {{ exercicio.repeticoes }}</li> }</ul></article> }<button type="button" (click)="confirmarFotosTreino()">CONFIRMAR IMPORTAÇÃO</button></div> }
+              <label class="gym-photo-picker">Adicionar fotos<input type="file" accept="image/jpeg,image/png,image/webp" multiple (change)="escolherAnexo($event)"></label>
+              @if (fotosPreparadas().length) { <p>{{ fotosPreparadas().length }} foto(s) preparada(s)</p><button type="button" (click)="lerFotosTreino()" [disabled]="academiaCarregando()">{{ academiaCarregando() ? 'Lendo fotos…' : 'Ler treinos com IA' }}</button> }
+              @if (previaTreinos().length && origemPrevia() === 'FOTO') { <div class="gym-preview"><h3>Prévia para confirmar</h3>@for (treino of previaTreinos(); track $index) { <article><strong>{{ treino.data }} · {{ treino.titulo }}</strong><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} · {{ exercicio.series }} × {{ exercicio.repeticoes }}</li> }</ul></article> }<button type="button" (click)="confirmarFotosTreino()">Confirmar importação</button></div> }
+            } @else if (abaAtiva() === 'Importar texto') {
+              <header><span>PLANO DO PERSONAL // TEXTO</span><h2>Importar programação</h2></header>
+              <p>Cole a mensagem completa do personal. O Gemini organiza os dias e mostra uma prévia antes de gravar. A programação começa hoje e vale pelo período indicado no texto.</p>
+              <label class="gym-text-label" for="textoPlano">Mensagem do personal</label>
+              <textarea id="textoPlano" class="gym-textarea" [formControl]="textoPlano" maxlength="20000" placeholder="Segunda-feira:&#10;Supino reto:&#10;4 x 12 ir: 01:00"></textarea>
+              <button type="button" [disabled]="academiaCarregando() || !textoPlano.value.trim()" (click)="lerTextoTreino()">{{ academiaCarregando() ? 'Analisando plano…' : 'Analisar plano' }}</button>
+              @if (previaTreinos().length && origemPrevia() === 'TEXTO') { <div class="gym-preview"><h3>Confira antes de importar · {{ previaTreinos().length }} dias</h3>@for (treino of previaTreinos(); track $index) { <article><strong>{{ treino.data }} · {{ treino.titulo }}</strong><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} · {{ exercicio.series }} × {{ exercicio.repeticoes }} · pausa {{ exercicio.pausasegundos }} s @if (exercicio.observacao) { · {{ exercicio.observacao }} }</li> }</ul></article> }<button type="button" (click)="confirmarTextoTreino()">Confirmar e importar</button><button type="button" (click)="previaTreinos.set([])">Cancelar</button></div> }
             } @else {
-              <header><span>PLANO ATIVO // ACADEMIA</span><h2>Meus treinos</h2></header>
-              @if (treinos().length === 0) { <p>Nenhum treino ainda. Importe fotos do professor na aba ao lado.</p> }
-              @for (treino of treinos(); track treino.id) { <article class="gym-training"><div><strong>{{ treino.data }} · {{ treino.titulo }}</strong><label>MOVER PARA <input type="date" [value]="treino.data" (change)="moverTreino(treino, $any($event.target).value)"></label></div><ul>@for (exercicio of treino.exercicios; track $index) { <li>{{ exercicio.nome }} <small>{{ exercicio.series }} · {{ exercicio.repeticoes }}{{ exercicio.observacao ? ' · ' + exercicio.observacao : '' }}</small></li> }</ul></article> }
+              <header><span>PLANO ATIVO // ACADEMIA</span><h2>Seu treino, série por série</h2></header>
+              @if (treinos().length === 0) { <div class="gym-empty"><p>Nenhum treino ainda. Cole a mensagem do personal em “Importar texto” ou envie no chat.</p><button type="button" (click)="abaAtiva.set('Importar texto')">Importar texto</button></div> }
+              @if (treinos().length) {
+                <div class="gym-layout">
+                  <aside class="gym-schedule" aria-label="Dias de treino"><h3>PROGRAMAÇÃO</h3>@for (treino of treinos(); track treino.id) { <button type="button" [class.active]="treino.id === treinoSelecionadoId()" (click)="selecionarTreino(treino)"><span>{{ treino.data }}</span><strong>{{ treino.titulo }}</strong><small>{{ treino.exercicios.length }} exercícios</small></button> }</aside>
+                  @if (treinoSelecionado(); as treino) { <div class="gym-session"><div class="gym-session-head"><div><span>SESSÃO SELECIONADA</span><h3>{{ treino.titulo }}</h3><small>{{ treino.data }} · {{ treino.exercicios.length }} exercícios</small></div><label>REMARCAR <input type="date" [value]="treino.data" (change)="moverTreino(treino, $any($event.target).value)"></label></div>
+                    <div class="gym-exercise-list" aria-label="Exercícios">@for (exercicio of treino.exercicios; track exercicio.id) { <button type="button" class="gym-exercise" [class.active]="exercicio.id === exercicioSelecionadoId()" (click)="selecionarExercicio(exercicio.id)"><span class="gym-thumb">@if (idVideo(exercicio.videourl); as videoId) { <img [src]="'https://i.ytimg.com/vi/' + videoId + '/mqdefault.jpg'" [alt]="'Vídeo de ' + exercicio.nome" loading="lazy"> } @else { ▶ }</span><span class="gym-exercise-name"><strong>{{ exercicio.nome }}</strong><small>{{ exercicio.seriesconcluidas }}/{{ totalSeries(exercicio.series) }} séries · {{ exercicio.repeticoes }} repetições</small></span><span class="gym-exercise-arrow">›</span></button> }</div>
+                    @if (exercicioSelecionado(); as exercicio) { <div class="gym-coach"><span class="gym-eyebrow">EXERCÍCIO ATIVO</span><h3>{{ exercicio.nome }}</h3><p>{{ exercicio.series }} séries · {{ exercicio.repeticoes }} repetições · {{ exercicio.pausasegundos }} s de descanso</p>@if (exercicio.observacao) { <p>{{ exercicio.observacao }}</p> }
+                      <div class="gym-coach-fields"><label>CARGA (KG)<input type="number" min="0" max="2000" step="0.5" [value]="cargaAtual() ?? ''" (input)="atualizarCarga($event)" inputmode="decimal"></label><div><span>PROGRESSO</span><strong>{{ exercicio.seriesconcluidas }} / {{ totalSeries(exercicio.series) }}</strong></div></div>
+                      @if (exercicio.seriesregistradas.length) { <div class="gym-series-history" aria-label="Cargas registradas">@for (serie of exercicio.seriesregistradas; track serie.numero) { <span>S{{ serie.numero }} · {{ serie.carga === null ? 'sem carga' : serie.carga + ' kg' }}</span> }</div> }
+                      @if (faseTreino() === 'PAUSA') { <div class="gym-rest" role="timer"><span>INTERVALO DE REPOUSO</span><strong>{{ segundosPausa() }} s</strong><small>Próxima série liberada ao final.</small></div> }
+                      <button type="button" class="gym-play" [disabled]="faseTreino() === 'PAUSA' || exercicio.seriesconcluidas >= totalSeries(exercicio.series)" (click)="avancarSerie()">{{ faseTreino() === 'EXECUTANDO' ? '✓ CONCLUIR SÉRIE' : faseTreino() === 'PAUSA' ? 'DESCANSANDO…' : exercicio.seriesconcluidas >= totalSeries(exercicio.series) ? 'EXERCÍCIO CONCLUÍDO' : '▶ INICIAR SÉRIE' }}</button>
+                      <div class="gym-video-actions">@if (exercicio.videourl) { <button type="button" (click)="abrirVideo(exercicio.videourl)">▶ VER EXECUÇÃO</button> }<button type="button" [disabled]="buscandoVideo()" (click)="encontrarVideo()">{{ buscandoVideo() ? 'BUSCANDO…' : exercicio.videourl ? 'BUSCAR OUTRO VÍDEO' : 'BUSCAR VÍDEO COM GEMINI' }}</button><a [href]="'https://www.youtube.com/results?search_query=' + encodeURIComponent(exercicio.nome + ' execução')" target="_blank" rel="noopener noreferrer">PESQUISAR NO YOUTUBE ↗</a></div>
+                      <div class="gym-video-manual"><input aria-label="Link do vídeo do YouTube" [formControl]="videoManual" placeholder="Cole um link do YouTube"><button type="button" [disabled]="!videoManual.value.trim()" (click)="adicionarVideoManual()">SALVAR VÍDEO</button></div>
+                    </div> }
+                  </div> }
+                </div>
+              }
             }
             @if (academiaMensagem()) { <p role="status">{{ academiaMensagem() }}</p> }
           </section>
@@ -142,8 +164,32 @@
   }
 </main>
 
-<aside class="coordinates"><span>LAT <b>--23.5505</b></span><span>LNG <b>--46.6333</b></span></aside>
-<aside class="secure"><i></i>CONEXÃO SEGURA</aside>
+@if (autenticado()) {
+  @if (chatAberto()) {
+    <button type="button" class="chat-scrim" aria-label="Fechar conversa" (click)="fecharChat()"></button>
+    <section class="chat-panel" role="dialog" aria-modal="true" aria-labelledby="tituloChat">
+      <header><div><span>CONVERSA // ZYVEN</span><h2 id="tituloChat">Olá Tuco.</h2></div><button type="button" aria-label="Fechar conversa" (click)="fecharChat()">×</button></header>
+      <div class="chat-messages" aria-live="polite">
+        @for (mensagem of mensagensChat(); track $index) { <article [class.mine]="mensagem.papel === 'usuario'"><small>{{ mensagem.papel === 'usuario' ? 'VOCÊ' : 'ZYVEN' }}</small><p>{{ mensagem.texto }}</p></article> }
+      </div>
+      @if (arquivoPreparado(); as arquivo) { <div class="staged-file" role="status"><span>OFX PREPARADO <strong>{{ arquivo.name }}</strong></span><button type="button" (click)="arquivoPreparado.set(null)" aria-label="Remover arquivo preparado">×</button></div> }
+      @if (fotosPreparadas().length) { <div class="staged-file" role="status"><span>FOTOS PREPARADAS <strong>{{ fotosPreparadas().length }} para leitura de treinos</strong></span><button type="button" (click)="fotosPreparadas.set([]); previaTreinos.set([])" aria-label="Remover fotos preparadas">×</button></div> }
+      <form class="chat-compose" (submit)="enviarComando($event)"><label for="comandoZyven">Mensagem para Zyven</label><div><textarea id="comandoZyven" [formControl]="comando" placeholder="Escreva sua mensagem ou cole um treino completo…" maxlength="20000" rows="2" (keydown)="teclaChat($event)"></textarea><button type="submit">ENVIAR</button></div></form>
+    </section>
+  }
+  <nav class="assistant-dock" aria-label="Conversa com Zyven">
+    <button type="button" class="floating-voice" [class.listening]="audioState.listening()" [class.speaking]="audioState.speaking()" aria-label="Abrir conversa com Zyven" (pointerdown)="iniciarArrasteNucleo($event)" (pointerup)="finalizarArrasteNucleo($event)" (click)="abrirChat()"><app-voice-waveform class="compact" /></button>
+    <button type="button" class="dock-status" (click)="iniciarVoz()" [attr.aria-label]="audioState.status()" [title]="audioState.status()"><i [class.online]="audioState.connected()"></i><span>{{ audioState.connected() ? 'Voz ativa' : audioState.status().toLowerCase().includes('indispon') ? 'Voz indisponível' : 'Ativar voz' }}</span></button>
+    <button type="button" class="dock-chat" (click)="abrirChat()">Digitar</button>
+    <div class="attachment-control"><button type="button" class="attachment-trigger" aria-label="Adicionar arquivo ou foto" [attr.aria-expanded]="menuAnexosAberto()" (click)="menuAnexosAberto.set(!menuAnexosAberto())">+</button>@if (menuAnexosAberto()) { <div class="attachment-menu"><label>ESCOLHER ARQUIVO<input type="file" accept=".ofx,image/*" multiple (change)="escolherAnexo($event)"></label><label>TIRAR FOTO<input type="file" accept="image/*" capture="environment" (change)="escolherAnexo($event)"></label></div> }</div>
+  </nav>
+}
+
+@if (videoSeguro(); as video) {
+  <div class="gym-video-backdrop" role="presentation" (click)="videoAberto.set(null)">
+    <section class="gym-video-dialog" role="dialog" aria-modal="true" aria-label="Vídeo de execução do exercício" (click)="$event.stopPropagation()"><button type="button" aria-label="Fechar vídeo" (click)="videoAberto.set(null)">×</button><iframe [src]="video" title="Execução do exercício" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></section>
+  </div>
+}
 
 
 @if (modalAberto()) {
